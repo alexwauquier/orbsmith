@@ -6,7 +6,7 @@
   import { Input } from "$lib/components/ui/input";
   import { Spinner } from "$lib/components/ui/spinner";
   import AppIcon from "$lib/components/AppIcon.svelte";
-  import { MAX_TIMER_MINUTES, QUEST_MARGIN_SECS, type AppSummary } from "$lib/api";
+  import { DETECTION_DELAY_SECS, MAX_TIMER_MINUTES, type AppSummary } from "$lib/api";
 
   let {
     app,
@@ -19,8 +19,7 @@
     onstart: (app: AppSummary, durationSecs: number | undefined) => Promise<void>;
   } = $props();
 
-  const marginMinutes = QUEST_MARGIN_SECS / 60;
-  const maxQuestMinutes = MAX_TIMER_MINUTES - marginMinutes;
+  const maxQuestMinutes = Math.floor((MAX_TIMER_MINUTES * 60 - DETECTION_DELAY_SECS) / 60);
 
   let questMinutes = $state(15);
   let autoStop = $state(true);
@@ -36,7 +35,7 @@
     if (!app || !valid) return;
     starting = true;
     try {
-      await onstart(app, autoStop ? questMinutes * 60 + QUEST_MARGIN_SECS : undefined);
+      await onstart(app, autoStop ? questMinutes * 60 + DETECTION_DELAY_SECS : undefined);
     } finally {
       starting = false;
     }
@@ -83,8 +82,7 @@
             />
             <Field.FieldDescription>
               {#if autoStop}
-                Stops after {questMinutes || 0} + {marginMinutes} minutes, leaving time for the game to
-                be detected.
+                Stops after {questMinutes || 0} minutes.
               {:else}
                 Runs until you stop it.
               {/if}

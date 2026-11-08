@@ -64,8 +64,11 @@ export function onSimulationEnded(handler: (ended: SimulationEnded) => void): Pr
   return listen<SimulationEnded>("simulation-ended", (event) => handler(event.payload));
 }
 
-/** Discord takes a moment to detect a process, so quests get a safety margin. */
-export const QUEST_MARGIN_SECS = 2 * 60;
+/**
+ * Added to a quest's duration so the timer starts once the process is up;
+ * Discord detects it almost immediately.
+ */
+export const DETECTION_DELAY_SECS = 1;
 
 /** Longest auto-stop timer the backend accepts (`MAX_DURATION`, 7 days). */
 export const MAX_TIMER_MINUTES = 7 * 24 * 60;
