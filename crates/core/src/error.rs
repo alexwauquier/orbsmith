@@ -12,4 +12,18 @@ pub enum Error {
     UnknownApp(String),
     #[error("{0} has no executable that can be simulated on this platform")]
     NoExecutable(String),
+    #[error("{0} is already running")]
+    AlreadyRunning(String),
+    #[error("no simulation is running for {0}")]
+    NotRunning(String),
+    #[error("dummy executable not found at {0}")]
+    MissingDummy(String),
+    #[error("refusing to create {0}: it resolves outside the executables directory")]
+    OutsideExecutablesDir(String),
+    #[error("could not launch {path}: {source}")]
+    Spawn {
+        path: String,
+        #[source]
+        source: io::Error,
+    },
 }
