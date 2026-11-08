@@ -9,6 +9,7 @@ dist-ssr/
 # Rust and Tauri build output
 /target/
 src-tauri/gen/schemas/
+src-tauri/binaries/
 
 # Logs
 logs/
