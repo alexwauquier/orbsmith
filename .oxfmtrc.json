@@ -2,5 +2,8 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "trailingComma": "none",
   "svelte": true,
+  "sortTailwindcss": {
+    "stylesheet": "./src/app.css"
+  },
   "ignorePatterns": ["src-tauri/", "pnpm-lock.yaml"]
 }
