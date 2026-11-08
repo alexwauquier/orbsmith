@@ -2,6 +2,7 @@
 //! executable paths and the lifecycle of dummy processes.
 
 pub mod catalog;
+pub mod cleanup;
 pub mod error;
 pub mod exe_path;
 pub mod layout;

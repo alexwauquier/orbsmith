@@ -22,4 +22,9 @@ impl Os {
             Os::MacOs => "darwin",
         }
     }
+
+    /// Whether file paths compare case-insensitively by default.
+    pub fn case_insensitive_paths(self) -> bool {
+        matches!(self, Os::Windows | Os::MacOs)
+    }
 }
