@@ -25,9 +25,14 @@ pub struct InvalidExeName {
 const WINDOWS_FORBIDDEN: &[char] = &['<', '>', ':', '"', '|', '?', '*', '\\'];
 
 const WINDOWS_RESERVED: &[&str] = &[
-    "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
-    "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+    "con", "prn", "aux", "nul", "conin$", "conout$", "com1", "com2", "com3", "com4", "com5",
+    "com6", "com7", "com8", "com9", "com¹", "com²", "com³", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5",
+    "lpt6", "lpt7", "lpt8", "lpt9", "lpt¹", "lpt²", "lpt³",
 ];
+
+/// Windows runs these through `cmd.exe`, which would interpret the dummy's
+/// bytes as a script instead of starting it.
+const WINDOWS_SCRIPT_EXTENSIONS: &[&str] = &[".bat", ".cmd"];
 
 impl ExePath {
     pub fn parse(raw: &str, os: Os) -> Result<Self, InvalidExeName> {
@@ -46,6 +51,15 @@ impl ExePath {
             .map(|component| check_component(component, os).map_err(invalid))
             .collect::<Result<Vec<_>, _>>()?;
         let file_name = dirs.pop().ok_or_else(|| invalid("empty name"))?;
+        if os == Os::Windows {
+            let lower = file_name.to_lowercase();
+            if WINDOWS_SCRIPT_EXTENSIONS
+                .iter()
+                .any(|ext| lower.ends_with(ext))
+            {
+                return Err(invalid("batch files cannot be simulated"));
+            }
+        }
 
         Ok(Self { dirs, file_name })
     }
@@ -96,8 +110,9 @@ fn check_component(component: &str, os: Os) -> Result<String, &'static str> {
         if component.ends_with(['.', ' ']) {
             return Err("trailing dot or space");
         }
-        let stem = component.split('.').next().unwrap_or(component);
-        if WINDOWS_RESERVED.contains(&stem.to_ascii_lowercase().as_str()) {
+        // Windows ignores trailing spaces before the extension: `nul .txt` is NUL.
+        let stem = component.split('.').next().unwrap_or(component).trim_end();
+        if WINDOWS_RESERVED.contains(&stem.to_lowercase().as_str()) {
             return Err("reserved Windows device name");
         }
     }
@@ -170,6 +185,13 @@ mod tests {
             "game./game.exe",
             "game.exe ",
             "a\u{0}b",
+            "conin$",
+            "CONOUT$.exe",
+            "com¹.exe",
+            "LPT³",
+            "nul .exe",
+            "run.bat",
+            "bin/RUN.CMD",
         ] {
             assert!(win(raw).is_err(), "{raw:?} should be rejected");
         }
@@ -179,6 +201,7 @@ mod tests {
     fn linux_rules_allow_what_unix_file_names_allow() {
         assert!(ExePath::parse("va-11 hall-a/runner\"", Os::Linux).is_ok());
         assert!(ExePath::parse("con", Os::Linux).is_ok());
+        assert!(ExePath::parse("run.bat", Os::Linux).is_ok());
         assert!(ExePath::parse("../evil", Os::Linux).is_err());
         assert!(ExePath::parse("/usr/bin/evil", Os::Linux).is_err());
     }
