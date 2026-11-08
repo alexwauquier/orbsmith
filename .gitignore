@@ -6,8 +6,8 @@ dist/
 dist-ssr/
 *.local
 
-# Tauri build output
-src-tauri/target/
+# Rust and Tauri build output
+/target/
 src-tauri/gen/schemas/
 
 # Logs

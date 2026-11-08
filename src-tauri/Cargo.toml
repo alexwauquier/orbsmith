@@ -1,12 +1,12 @@
 [package]
 name = "orbsmith"
-version = "0.1.0"
 description = "Launches stand-in processes so desktop apps detect a game as running"
-authors = ["Alex Wauquier"]
-license = "MIT"
-repository = "https://github.com/alexwauquier/orbsmith"
-edition = "2024"
-rust-version = "1.90"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 
 [lib]
 name = "orbsmith_lib"
