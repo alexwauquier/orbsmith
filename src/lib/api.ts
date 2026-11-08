@@ -67,6 +67,9 @@ export function onSimulationEnded(handler: (ended: SimulationEnded) => void): Pr
 /** Discord takes a moment to detect a process, so quests get a safety margin. */
 export const QUEST_MARGIN_SECS = 2 * 60;
 
+/** Longest auto-stop timer the backend accepts (`MAX_DURATION`, 7 days). */
+export const MAX_TIMER_MINUTES = 7 * 24 * 60;
+
 export function iconUrl(app: Pick<AppSummary, "id" | "iconHash">, size = 64): string | null {
   return app.iconHash
     ? `https://cdn.discordapp.com/app-icons/${app.id}/${app.iconHash}.png?size=${size}`
