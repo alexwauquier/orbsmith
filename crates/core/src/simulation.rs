@@ -17,6 +17,10 @@ pub const PARENT_PID_ENV: &str = "ORBSMITH_PARENT_PID";
 /// crate.
 pub const TITLE_ENV: &str = "ORBSMITH_TITLE";
 
+/// Longest accepted auto-stop timer. Quests last minutes; without a timer a
+/// simulation already runs until stopped.
+pub const MAX_DURATION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SimulationInfo {
@@ -50,6 +54,17 @@ struct Running {
     info: SimulationInfo,
     stop_at: Option<SystemTime>,
     child: Child,
+}
+
+fn deadline(now: SystemTime, duration: Option<Duration>) -> Result<Option<SystemTime>, Error> {
+    duration
+        .map(|duration| {
+            if duration > MAX_DURATION {
+                return Err(Error::TimerTooLong);
+            }
+            now.checked_add(duration).ok_or(Error::TimerTooLong)
+        })
+        .transpose()
 }
 
 /// Creates `exe_dir` under `base` and checks that `exe` really resolves
@@ -114,6 +129,8 @@ impl Simulations {
         let target = app
             .target(os)
             .ok_or_else(|| Error::NoExecutable(app.name.clone()))?;
+        let now = SystemTime::now();
+        let stop_at = deadline(now, duration)?;
 
         if !self.dummy.is_file() {
             return Err(Error::MissingDummy(self.dummy.display().to_string()));
@@ -138,8 +155,6 @@ impl Simulations {
             source,
         })?;
 
-        let now = SystemTime::now();
-        let stop_at = duration.map(|d| now + d);
         let info = SimulationInfo {
             app_id: app.id.clone(),
             app_name: app.name.clone(),
@@ -191,7 +206,7 @@ impl Simulations {
             .running
             .get_mut(app_id)
             .ok_or_else(|| Error::NotRunning(app_id.to_owned()))?;
-        running.stop_at = duration.map(|d| SystemTime::now() + d);
+        running.stop_at = deadline(SystemTime::now(), duration)?;
         running.info.stop_at = running.stop_at.map(unix_ms);
         Ok(running.info.clone())
     }
@@ -372,6 +387,23 @@ mod tests {
             sims.tick(SystemTime::now() + Duration::from_secs(3600))
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn rejects_timers_beyond_the_maximum() {
+        let (_dir, mut sims, app) = setup("Too long");
+        let too_long = Some(MAX_DURATION + Duration::from_secs(1));
+        assert!(matches!(
+            sims.start(&app, Os::CURRENT, too_long),
+            Err(Error::TimerTooLong)
+        ));
+        assert!(sims.list().is_empty());
+
+        sims.start(&app, Os::CURRENT, Some(MAX_DURATION)).unwrap();
+        assert!(matches!(
+            sims.set_timer("42", Some(Duration::MAX)),
+            Err(Error::TimerTooLong)
+        ));
     }
 
     #[test]

@@ -18,6 +18,8 @@ pub enum Error {
     NotRunning(String),
     #[error("dummy executable not found at {0}")]
     MissingDummy(String),
+    #[error("the auto-stop timer cannot exceed 7 days")]
+    TimerTooLong,
     #[error("refusing to create {0}: it resolves outside the executables directory")]
     OutsideExecutablesDir(String),
     #[error("could not launch {path}: {source}")]
