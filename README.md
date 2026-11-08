@@ -9,6 +9,9 @@ Desktop app that launches stand-in processes named after game executables, so th
 > [!IMPORTANT]
 > Orbsmith is not affiliated with any software or game publisher.
 
+> [!WARNING]
+> Using Orbsmith may go against the terms of service of the software that detects running games. Use it at your own risk.
+
 ## Tech stack
 
 - [Tauri 2](https://tauri.app) (Rust backend, system WebView)
