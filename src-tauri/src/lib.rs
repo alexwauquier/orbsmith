@@ -3,7 +3,7 @@ mod state;
 
 use std::time::{Duration, SystemTime};
 
-use orbsmith_core::{Layout, cleanup};
+use orbsmith_core::{Layout, Os, cleanup};
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
 
 use crate::state::AppState;
@@ -24,7 +24,9 @@ pub fn run() -> tauri::Result<()> {
                 )?;
             }
 
-            let layout = Layout::new(app.path().app_data_dir()?);
+            // A readable folder name instead of Tauri's default, the bundle
+            // identifier.
+            let layout = Layout::for_user(&app.path().data_dir()?, Os::CURRENT);
             let killed = cleanup::kill_orphans(&layout.executables_dir());
             if killed > 0 {
                 log::info!("cleaned up {killed} orphan dummies");

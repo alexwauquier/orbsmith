@@ -27,4 +27,13 @@ impl Os {
     pub fn case_insensitive_paths(self) -> bool {
         matches!(self, Os::Windows | Os::MacOs)
     }
+
+    /// Name of Orbsmith's folder in the per-user data dir, following each
+    /// platform's habits: `Orbsmith` on Windows and macOS, lowercase on Linux.
+    pub fn data_dir_name(self) -> &'static str {
+        match self {
+            Os::Windows | Os::MacOs => "Orbsmith",
+            Os::Linux => "orbsmith",
+        }
+    }
 }
