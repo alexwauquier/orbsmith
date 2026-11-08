@@ -2109,6 +2109,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "orbsmith-core"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "pango"
 version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

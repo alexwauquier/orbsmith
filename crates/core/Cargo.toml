@@ -1,0 +1,13 @@
+[package]
+name = "orbsmith-core"
+description = "Catalog, path and process logic for Orbsmith"
+publish = false
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = "2"
