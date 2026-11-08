@@ -1,4 +1,8 @@
-# Orbsmith
+<p align="center">
+  <img src="assets/logo.svg" alt="" width="128" height="128">
+</p>
+
+<h1 align="center">Orbsmith</h1>
 
 Desktop app that launches stand-in processes named after game executables, so that software detecting running games sees them as launched.
 

@@ -33,6 +33,7 @@
   } from "$lib/api";
   import { searchApps } from "$lib/search";
   import { formatAgo } from "$lib/time";
+  import logo from "../assets/logo.svg";
 
   const RESULT_LIMIT = 50;
 
@@ -123,6 +124,7 @@
 
 <div class="flex h-screen flex-col">
   <header class="flex items-center gap-3 px-4 py-3">
+    <img src={logo} alt="" class="size-7" />
     <h1 class="text-lg font-semibold">Orbsmith</h1>
     <div class="ml-auto flex items-center gap-2">
       {#if fetchedAt !== null}
