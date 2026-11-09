@@ -44,6 +44,11 @@ export class LibraryStore {
     this.save();
   }
 
+  clearRecent() {
+    this.recent = [];
+    this.save();
+  }
+
   markUsed(id: string) {
     this.recent = addRecent(this.recent, id);
     this.save();

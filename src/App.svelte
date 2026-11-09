@@ -29,6 +29,7 @@
     listSimulations,
     addToQueue,
     getSettings,
+    clearQueue,
     listQueue,
     moveInQueue,
     onQueueChanged,
@@ -306,9 +307,19 @@
               {/if}
               {#if recentApps.length > 0}
                 <section class="flex flex-col gap-1" aria-labelledby="recent-heading">
-                  <h2 id="recent-heading" class="px-1 text-xs font-medium text-muted-foreground">
-                    Recent
-                  </h2>
+                  <div class="flex items-center px-1">
+                    <h2 id="recent-heading" class="text-xs font-medium text-muted-foreground">
+                      Recent
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      class="ml-auto"
+                      onclick={() => library.clearRecent()}
+                    >
+                      Clear
+                    </Button>
+                  </div>
                   <Item.Group class="gap-1">
                     {#each recentApps as app (app.id)}
                       {@render row(app)}
@@ -394,6 +405,10 @@
               onpause={() =>
                 void attempt(async () => {
                   queue = await pauseQueue();
+                })}
+              onclear={() =>
+                void attempt(async () => {
+                  queue = await clearQueue();
                 })}
               onmove={(appId, up) =>
                 void attempt(async () => {
