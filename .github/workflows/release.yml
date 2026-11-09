@@ -61,6 +61,7 @@ jobs:
       contents: write # create the draft release and upload its assets
     outputs:
       release-id: ${{ steps.tauri.outputs.releaseId }}
+      notes: ${{ steps.notes.outputs.body }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -131,12 +132,19 @@ jobs:
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the installers for the in-app updater, which checks them
+          # against the public key in tauri.conf.json.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # Empty outside tag builds, so no release is created.
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: Orbsmith __VERSION__
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
+          # latest.json lists both installers; this picks the one updating an
+          # install whose installer type is unknown.
+          updaterJsonPreferNsis: true
           uploadWorkflowArtifacts: true
 
   linux:
@@ -187,7 +195,12 @@ jobs:
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # Empty outside tag builds, so nothing is uploaded to a release.
           releaseId: ${{ github.ref_type == 'tag' && needs.windows.outputs.release-id || '' }}
+          # This job rewrites latest.json, adding the Linux packages to the
+          # Windows entries; its notes replace the ones written there.
+          releaseBody: ${{ needs.windows.outputs.notes }}
           uploadWorkflowArtifacts: true
