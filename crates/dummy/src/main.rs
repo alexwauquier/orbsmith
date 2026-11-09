@@ -1,8 +1,9 @@
 //! Stand-in process. Orbsmith copies this binary under a game's executable name
 //! and runs it so that game detection sees the game as running.
 //!
-//! It does nothing but stay alive, with a small window on Windows, and exits as
-//! soon as the Orbsmith process that launched it is gone.
+//! It does nothing but stay alive and exits as soon as the Orbsmith process
+//! that launched it is gone. On Windows it owns a window titled after the game
+//! that is never shown, so it stays out of the taskbar and Alt+Tab.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -28,15 +29,14 @@ mod platform {
     use std::ptr::null;
 
     use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-    use windows_sys::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::System::Threading::{
         INFINITE, OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, IDC_ARROW,
-        LoadCursorW, MSG, PostQuitMessage, RegisterClassW, SW_SHOWMINNOACTIVE, ShowWindow,
-        TranslateMessage, WM_DESTROY, WNDCLASSW, WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, MSG,
+        PostQuitMessage, RegisterClassW, TranslateMessage, WM_DESTROY, WNDCLASSW, WS_EX_TOOLWINDOW,
+        WS_OVERLAPPED,
     };
 
     /// Exits the process once `pid` terminates. If it is already gone, exits
@@ -56,8 +56,9 @@ mod platform {
         });
     }
 
-    /// Shows a minimized, empty window and runs its message loop until the
-    /// window is closed.
+    /// Creates the game's window without ever showing it, and runs its message
+    /// loop. A tool window that is not shown has no taskbar or Alt+Tab entry;
+    /// it exists in case detection looks at the process's windows.
     pub fn run(title: &str) {
         let class_name = wide("OrbsmithDummy");
         let title = wide(title);
@@ -70,17 +71,15 @@ mod platform {
                 lpfnWndProc: Some(window_proc),
                 hInstance: instance,
                 lpszClassName: class_name.as_ptr(),
-                hCursor: LoadCursorW(std::ptr::null_mut(), IDC_ARROW),
-                hbrBackground: (COLOR_WINDOW + 1) as usize as HBRUSH,
                 ..std::mem::zeroed()
             };
             RegisterClassW(&class);
 
             let window = CreateWindowExW(
-                0,
+                WS_EX_TOOLWINDOW,
                 class_name.as_ptr(),
                 title.as_ptr(),
-                WS_OVERLAPPEDWINDOW,
+                WS_OVERLAPPED,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
                 320,
@@ -93,7 +92,6 @@ mod platform {
             if window.is_null() {
                 return;
             }
-            ShowWindow(window, SW_SHOWMINNOACTIVE);
 
             let mut message: MSG = std::mem::zeroed();
             while GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) > 0 {
