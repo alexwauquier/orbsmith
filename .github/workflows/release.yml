@@ -1,8 +1,9 @@
 name: Release
 
 # Pushing a `v*` tag builds the Windows installers and attaches them to a
-# draft GitHub release. Running the workflow by hand builds them as workflow
-# artifacts only, without creating a release.
+# draft GitHub release, once CI has passed for the tagged commit. Running the
+# workflow by hand builds them as workflow artifacts only, without creating a
+# release.
 on:
   push:
     tags: ["v*"]
@@ -15,8 +16,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ci-passed:
+    name: Check that CI passed for the tagged commit
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      actions: read # list the CI runs of the commit
+    steps:
+      # Waits while CI is still running for the commit, so the tag can be
+      # pushed right after develop.
+      - name: Wait for a successful CI run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          for attempt in $(seq 1 40); do
+            runs="$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&per_page=100")"
+            passed="$(jq '[.workflow_runs[] | select(.conclusion == "success")] | length' <<< "$runs")"
+            pending="$(jq '[.workflow_runs[] | select(.status != "completed")] | length' <<< "$runs")"
+            if [ "$passed" -gt 0 ]; then
+              echo "CI passed for $SHA."
+              exit 0
+            fi
+            if [ "$pending" -eq 0 ]; then
+              echo "::error::No successful CI run for $SHA. Push it to develop and let CI pass before tagging."
+              exit 1
+            fi
+            echo "CI is still running for $SHA, checking again in 30 s ($attempt/40)."
+            sleep 30
+          done
+          echo "::error::CI did not finish for $SHA within 20 minutes."
+          exit 1
+
   windows:
     name: Build Windows installers
+    needs: ci-passed
+    # The check is skipped for manual runs, which create no release.
+    if: ${{ !cancelled() && (needs.ci-passed.result == 'success' || needs.ci-passed.result == 'skipped') }}
     runs-on: windows-latest
     timeout-minutes: 60
     permissions:
