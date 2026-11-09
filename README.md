@@ -37,7 +37,17 @@ Download the package for your distribution from the [Releases](https://github.co
 - Fedora, openSUSE and derivatives: `Orbsmith-<version>-1.x86_64.rpm`, installed with `sudo dnf install ./Orbsmith-<version>-1.x86_64.rpm`.
 - Any other distribution: `Orbsmith_<version>_amd64.AppImage`. Make it executable (`chmod +x`), then run it. It may need FUSE 2 (`libfuse2` on Ubuntu).
 
-On GNOME, the tray icon needs the AppIndicator extension, which Ubuntu ships by default. Without it, a window closed while games run cannot be reopened until Orbsmith quits.
+On GNOME, the tray icon needs the AppIndicator extension, which Ubuntu ships by default. Without it, start Orbsmith again to bring back a window closed while games run.
+
+### Verifying a download
+
+Releases are not code-signed, but every file on the Releases page comes with a build provenance attestation: a signed record, kept by GitHub, of the workflow run and the commit that built it. With the [GitHub CLI](https://cli.github.com), check a downloaded file with:
+
+```sh
+gh attestation verify Orbsmith_<version>_x64-setup.exe -R alexwauquier/orbsmith
+```
+
+The Releases page also lists the SHA-256 checksum of each file.
 
 ## Usage
 
@@ -59,7 +69,7 @@ Simulated games run in the background: they don't appear in the taskbar. A notif
 
 Closing the window while games are running keeps Orbsmith in the system tray, so they keep running. Click the tray icon to reopen it; its menu also stops every game or quits. With nothing running, closing the window quits Orbsmith. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
 
-The list of games is downloaded once and cached; use the refresh button in the header to update it. Orbsmith only downloads that public list, the game icons and, to look for updates, the latest release from GitHub: no account, no login.
+The list of games is cached and downloaded again once it is a day old; the refresh button in the header updates it right away. Orbsmith only downloads that public list, the game icons and, to look for updates, the latest release from GitHub: no account, no login.
 
 ### Updates
 
@@ -67,11 +77,21 @@ At startup, Orbsmith checks GitHub for a new version. When there is one, a banne
 
 Updates are signed, and Orbsmith refuses any download whose signature does not match. On Linux, updating a `.deb` or `.rpm` install asks for your password.
 
-Versions before 0.6.0 have no updater: install the new version over the old one, as the first time. Your data is kept.
+Versions before 1.0.0 have no updater: install the new version over the old one, as the first time. Your data is kept.
+
+## Troubleshooting
+
+**A game is missing from the list.** New games are added to the list over time: refresh it with the button in the header. Some games are not in it at all, because they are detected through their store (a Steam or other launcher install) rather than by their executable. Those cannot be simulated.
+
+**A game runs in Orbsmith but is not detected.** Click **Start** again and pick another executable in **Executable**: some are only recognized for a given store or region. Game detection only works in the official desktop app, not in browsers or third-party clients. On Linux, Orbsmith must run as the same user as that app.
+
+**My antivirus warns about Orbsmith.** Releases are not code-signed, which some antivirus software flags. Check that your download is the file built from this repository: see [Verifying a download](#verifying-a-download).
+
+**Something else is wrong.** [Open an issue](https://github.com/alexwauquier/orbsmith/issues) and attach the log: `logs/orbsmith.log` in the data folder (see below).
 
 ## Data and uninstalling
 
-Orbsmith keeps its data in `%APPDATA%\Orbsmith` on Windows and `~/.local/share/orbsmith` on Linux: the cached list of games, your settings, the queue, the stand-in executables, and the WebView data, which includes your favorites, recent games and how you last started each one.
+Orbsmith keeps its data in `%APPDATA%\Orbsmith` on Windows and `~/.local/share/orbsmith` on Linux: the cached list of games, your settings, the queue, the stand-in executables, the log, and the WebView data, which includes your favorites, recent games and how you last started each one.
 
 - The `setup.exe` uninstaller deletes that folder if you tick **Delete the application data**.
 - The MSI uninstaller leaves it in place, as Windows Installer does for user data. Delete the folder by hand to remove it.
