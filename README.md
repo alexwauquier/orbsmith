@@ -27,17 +27,19 @@ To update, run the installer of the new version. It detects the installed one an
 
 ## Usage
 
-1. Search for a game by name.
+1. Search for a game by name. Star the ones you use often: favorites and recently started games show up before you search.
 2. Click **Start**. Enter the quest duration: the game stops automatically once it has elapsed. Untick **Stop automatically** to keep it running until you stop it.
 3. The **Running** panel lists the active games with their remaining time. You can change the timer or stop a game at any time.
 
-Closing Orbsmith stops every game it started. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
+Simulated games run in the background: they don't appear in the taskbar. A notification tells you when one stops on its own.
+
+Closing the window while games are running keeps Orbsmith in the system tray, so they keep running. Click the tray icon to reopen it; its menu also stops every game or quits. With nothing running, closing the window quits Orbsmith. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
 
 The list of games is downloaded once and cached; use the refresh button in the header to update it. Orbsmith only downloads that public list and the game icons: no account, no login.
 
 ## Data and uninstalling
 
-Orbsmith keeps its data in `%APPDATA%\Orbsmith`: the cached list of games, the stand-in executables and the WebView cache.
+Orbsmith keeps its data in `%APPDATA%\Orbsmith`: the cached list of games, the stand-in executables, and the WebView data, which includes your favorites and recent games.
 
 - The `setup.exe` uninstaller deletes that folder if you tick **Delete the application data**.
 - The MSI uninstaller leaves it in place, as Windows Installer does for user data. Delete the folder by hand to remove it.
@@ -74,6 +76,7 @@ pnpm check         # type-check
 pnpm lint          # lint the code
 pnpm format        # format the code
 pnpm format:check  # check formatting
+pnpm test          # run the frontend tests
 cargo fmt --all    # format the Rust code
 cargo clippy --workspace --all-targets
 cargo test --workspace

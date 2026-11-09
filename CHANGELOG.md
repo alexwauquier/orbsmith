@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Tray icon to reopen Orbsmith, see the running games, stop them all or quit.
+- Closing the window while games are running keeps them running in the tray.
+- Desktop notification when a game stops on its own, because its timer ran out or it exited.
+- Favorite and recently started games, shown before searching.
+
+### Changed
+
+- Simulated games no longer appear in the taskbar.
+
 ## [0.1.0] - 2026-11-09
 
 ### Added
