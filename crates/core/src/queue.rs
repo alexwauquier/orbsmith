@@ -1,8 +1,8 @@
-//! The quest queue: games to play for a given time, started one after another
+//! The queue: games to play for a given time, started one after another
 //! or all at once.
 //!
 //! The queue only decides what to start. The caller owns the simulations: it
-//! starts what [`QuestQueue::next`] returns and reports failures back.
+//! starts what [`Queue::next`] returns and reports failures back.
 
 use std::collections::{HashSet, VecDeque};
 use std::time::Duration;
@@ -12,7 +12,7 @@ use serde::Serialize;
 use crate::error::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Quest {
+pub struct QueueItem {
     pub app_id: String,
     pub app_name: String,
     /// How long the game runs, auto-stop margin included.
@@ -21,72 +21,69 @@ pub struct Quest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct QuestInfo {
+pub struct QueueItemInfo {
     pub app_id: String,
     pub app_name: String,
     pub duration_secs: u64,
 }
 
-impl From<&Quest> for QuestInfo {
-    fn from(quest: &Quest) -> Self {
+impl From<&QueueItem> for QueueItemInfo {
+    fn from(item: &QueueItem) -> Self {
         Self {
-            app_id: quest.app_id.clone(),
-            app_name: quest.app_name.clone(),
-            duration_secs: quest.duration.as_secs(),
+            app_id: item.app_id.clone(),
+            app_name: item.app_name.clone(),
+            duration_secs: item.duration.as_secs(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct QuestsState {
+pub struct QueueState {
     /// Whether the queue is being worked through.
     pub running: bool,
-    /// Quests whose game was started and is still running.
-    pub active: Vec<QuestInfo>,
-    /// Quests waiting their turn, in order.
-    pub queued: Vec<QuestInfo>,
+    /// Items whose game was started and is still running.
+    pub active: Vec<QueueItemInfo>,
+    /// Items waiting their turn, in order.
+    pub queued: Vec<QueueItemInfo>,
 }
 
-/// What [`QuestQueue::next`] decided.
+/// What [`Queue::next`] decided.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Step {
-    /// Quests to start now. They already count as active; report the ones
-    /// that fail with [`QuestQueue::failed`].
-    pub start: Vec<Quest>,
-    /// The last quest just ended: the queue is done.
+    /// Items to start now. They already count as active; report the ones
+    /// that fail with [`Queue::failed`].
+    pub start: Vec<QueueItem>,
+    /// The last item just ended: the queue is done.
     pub finished: bool,
     /// Whether the state changed, so listeners need updating.
     pub changed: bool,
 }
 
 #[derive(Debug, Default)]
-pub struct QuestQueue {
-    queued: VecDeque<Quest>,
-    active: Vec<Quest>,
+pub struct Queue {
+    queued: VecDeque<QueueItem>,
+    active: Vec<QueueItem>,
     running: bool,
 }
 
-impl QuestQueue {
+impl Queue {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Appends a quest. A game can only be queued or active once.
-    pub fn add(&mut self, quest: Quest) -> Result<(), Error> {
-        if self.contains(&quest.app_id) {
-            return Err(Error::QuestAlreadyAdded(quest.app_name));
+    /// Appends an item. A game can only be queued or active once.
+    pub fn add(&mut self, item: QueueItem) -> Result<(), Error> {
+        if self.contains(&item.app_id) {
+            return Err(Error::AlreadyQueued(item.app_name));
         }
-        self.queued.push_back(quest);
+        self.queued.push_back(item);
         Ok(())
     }
 
-    /// Removes a quest that has not started yet.
-    pub fn remove(&mut self, app_id: &str) -> Option<Quest> {
-        let index = self
-            .queued
-            .iter()
-            .position(|quest| quest.app_id == app_id)?;
+    /// Removes an item that has not started yet.
+    pub fn remove(&mut self, app_id: &str) -> Option<QueueItem> {
+        let index = self.queued.iter().position(|item| item.app_id == app_id)?;
         self.queued.remove(index)
     }
 
@@ -94,24 +91,24 @@ impl QuestQueue {
         self.running = !self.queued.is_empty() || !self.active.is_empty();
     }
 
-    /// Pauses the queue. Active quests go back to the front, in order, and are
+    /// Pauses the queue. Active items go back to the front, in order, and are
     /// returned so the caller can stop their games.
-    pub fn stop(&mut self) -> Vec<Quest> {
+    pub fn stop(&mut self) -> Vec<QueueItem> {
         self.running = false;
         let active = std::mem::take(&mut self.active);
-        for quest in active.iter().rev() {
-            self.queued.push_front(quest.clone());
+        for item in active.iter().rev() {
+            self.queued.push_front(item.clone());
         }
         active
     }
 
-    /// Forgets active quests whose game no longer runs, since they are done or
-    /// were stopped, then picks the quests to start. `running_apps` holds the
-    /// IDs of every running simulation. A quest whose game already runs waits.
+    /// Forgets active items whose game no longer runs, since they are done or
+    /// were stopped, then picks the items to start. `running_apps` holds the
+    /// IDs of every running simulation. An item whose game already runs waits.
     pub fn next(&mut self, running_apps: &HashSet<String>, parallel: bool) -> Step {
         let before = self.active.len();
         self.active
-            .retain(|quest| running_apps.contains(&quest.app_id));
+            .retain(|item| running_apps.contains(&item.app_id));
         let mut step = Step {
             changed: self.active.len() != before,
             ..Step::default()
@@ -122,11 +119,11 @@ impl QuestQueue {
 
         if parallel {
             let mut waiting = VecDeque::new();
-            while let Some(quest) = self.queued.pop_front() {
-                if running_apps.contains(&quest.app_id) {
-                    waiting.push_back(quest);
+            while let Some(item) = self.queued.pop_front() {
+                if running_apps.contains(&item.app_id) {
+                    waiting.push_back(item);
                 } else {
-                    step.start.push(quest);
+                    step.start.push(item);
                 }
             }
             self.queued = waiting;
@@ -134,10 +131,10 @@ impl QuestQueue {
             && self
                 .queued
                 .front()
-                .is_some_and(|quest| !running_apps.contains(&quest.app_id))
-            && let Some(quest) = self.queued.pop_front()
+                .is_some_and(|item| !running_apps.contains(&item.app_id))
+            && let Some(item) = self.queued.pop_front()
         {
-            step.start.push(quest);
+            step.start.push(item);
         }
 
         self.active.extend(step.start.iter().cloned());
@@ -149,25 +146,25 @@ impl QuestQueue {
         step
     }
 
-    /// Drops an active quest whose game could not be started.
+    /// Drops an active item whose game could not be started.
     pub fn failed(&mut self, app_id: &str) {
-        self.active.retain(|quest| quest.app_id != app_id);
+        self.active.retain(|item| item.app_id != app_id);
     }
 
     pub fn is_running(&self) -> bool {
         self.running
     }
 
-    /// Quests not finished yet: active and queued.
+    /// Items not finished yet: active and queued.
     pub fn remaining(&self) -> usize {
         self.active.len() + self.queued.len()
     }
 
-    pub fn state(&self) -> QuestsState {
-        QuestsState {
+    pub fn state(&self) -> QueueState {
+        QueueState {
             running: self.running,
-            active: self.active.iter().map(QuestInfo::from).collect(),
-            queued: self.queued.iter().map(QuestInfo::from).collect(),
+            active: self.active.iter().map(QueueItemInfo::from).collect(),
+            queued: self.queued.iter().map(QueueItemInfo::from).collect(),
         }
     }
 
@@ -175,7 +172,7 @@ impl QuestQueue {
         self.queued
             .iter()
             .chain(&self.active)
-            .any(|quest| quest.app_id == app_id)
+            .any(|item| item.app_id == app_id)
     }
 }
 
@@ -183,18 +180,18 @@ impl QuestQueue {
 mod tests {
     use super::*;
 
-    fn quest(id: &str) -> Quest {
-        Quest {
+    fn item(id: &str) -> QueueItem {
+        QueueItem {
             app_id: id.to_owned(),
             app_name: format!("Game {id}"),
             duration: Duration::from_secs(60),
         }
     }
 
-    fn queue(ids: &[&str]) -> QuestQueue {
-        let mut queue = QuestQueue::new();
+    fn queue(ids: &[&str]) -> Queue {
+        let mut queue = Queue::new();
         for id in ids {
-            queue.add(quest(id)).unwrap();
+            queue.add(item(id)).unwrap();
         }
         queue
     }
@@ -204,22 +201,16 @@ mod tests {
     }
 
     fn started(step: &Step) -> Vec<&str> {
-        step.start
-            .iter()
-            .map(|quest| quest.app_id.as_str())
-            .collect()
+        step.start.iter().map(|item| item.app_id.as_str()).collect()
     }
 
     #[test]
     fn rejects_the_same_game_twice() {
         let mut queue = queue(&["a"]);
-        assert!(matches!(
-            queue.add(quest("a")),
-            Err(Error::QuestAlreadyAdded(_))
-        ));
+        assert!(matches!(queue.add(item("a")), Err(Error::AlreadyQueued(_))));
         queue.start();
         queue.next(&running(&[]), false);
-        assert!(queue.add(quest("a")).is_err(), "active quests count too");
+        assert!(queue.add(item("a")).is_err(), "active items count too");
     }
 
     #[test]
@@ -230,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn runs_quests_one_after_another() {
+    fn runs_items_one_after_another() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
 
@@ -250,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn runs_quests_in_parallel() {
+    fn runs_items_in_parallel() {
         let mut queue = queue(&["a", "b", "c"]);
         queue.start();
         assert_eq!(started(&queue.next(&running(&[]), true)), ["a", "b", "c"]);
@@ -274,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_start_moves_on_to_the_next_quest() {
+    fn a_failed_start_moves_on_to_the_next_item() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
         assert_eq!(started(&queue.next(&running(&[]), false)), ["a"]);
@@ -283,11 +274,11 @@ mod tests {
     }
 
     #[test]
-    fn stopping_puts_active_quests_back_in_front() {
+    fn stopping_puts_active_items_back_in_front() {
         let mut queue = queue(&["a", "b", "c"]);
         queue.start();
         queue.next(&running(&[]), true);
-        queue.add(quest("d")).unwrap();
+        queue.add(item("d")).unwrap();
 
         let stopped = queue.stop();
         assert_eq!(stopped.len(), 3);
@@ -298,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn removes_only_queued_quests() {
+    fn removes_only_queued_items() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
         queue.next(&running(&[]), false);
@@ -309,7 +300,7 @@ mod tests {
 
     #[test]
     fn starting_an_empty_queue_does_nothing() {
-        let mut queue = QuestQueue::new();
+        let mut queue = Queue::new();
         queue.start();
         assert!(!queue.is_running());
     }
@@ -319,10 +310,10 @@ mod tests {
         let queue = queue(&["a"]);
         assert_eq!(
             queue.state(),
-            QuestsState {
+            QueueState {
                 running: false,
                 active: vec![],
-                queued: vec![QuestInfo {
+                queued: vec![QueueItemInfo {
                     app_id: "a".into(),
                     app_name: "Game a".into(),
                     duration_secs: 60,

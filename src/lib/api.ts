@@ -30,26 +30,26 @@ export interface Simulation {
 
 /** Mirrors `orbsmith_core::Settings`. */
 export interface Settings {
-  /** Start every queued quest at once instead of one after another. */
-  questsInParallel: boolean;
+  /** Start every queued game at once instead of one after another. */
+  parallelQueue: boolean;
 }
 
-/** Mirrors `orbsmith_core::quests::QuestInfo`. */
-export interface Quest {
+/** Mirrors `orbsmith_core::queue::QueueItemInfo`. */
+export interface QueueItem {
   appId: string;
   appName: string;
   /** How long the game runs, auto-stop margin included. */
   durationSecs: number;
 }
 
-/** Mirrors `orbsmith_core::QuestsState`. */
-export interface QuestsState {
+/** Mirrors `orbsmith_core::QueueState`. */
+export interface QueueState {
   /** Whether the queue is being worked through. */
   running: boolean;
-  /** Quests whose game is running. */
-  active: Quest[];
-  /** Quests waiting their turn, in order. */
-  queued: Quest[];
+  /** Items whose game is running. */
+  active: QueueItem[];
+  /** Items waiting their turn, in order. */
+  queued: QueueItem[];
 }
 
 /** Uses the cached list unless `refresh` is set or there is no cache yet. */
@@ -87,7 +87,7 @@ export function onSimulationsChanged(handler: () => void): Promise<UnlistenFn> {
 }
 
 /**
- * Added to a quest's duration so the timer starts once the process is up;
+ * Added to every timer so it counts from once the process is up;
  * Discord detects it almost immediately.
  */
 export const DETECTION_DELAY_SECS = 1;
@@ -109,29 +109,29 @@ export function setSettings(settings: Settings): Promise<Settings> {
   return invoke("set_settings", { settings });
 }
 
-export function listQuests(): Promise<QuestsState> {
-  return invoke("list_quests");
+export function listQueue(): Promise<QueueState> {
+  return invoke("list_queue");
 }
 
 /** `durationSecs` includes the auto-stop margin, like `startSimulation`. */
-export function addQuest(appId: string, durationSecs: number): Promise<QuestsState> {
-  return invoke("add_quest", { appId, durationSecs });
+export function addToQueue(appId: string, durationSecs: number): Promise<QueueState> {
+  return invoke("add_to_queue", { appId, durationSecs });
 }
 
-export function removeQuest(appId: string): Promise<QuestsState> {
-  return invoke("remove_quest", { appId });
+export function removeFromQueue(appId: string): Promise<QueueState> {
+  return invoke("remove_from_queue", { appId });
 }
 
-export function startQuests(): Promise<QuestsState> {
-  return invoke("start_quests");
+export function startQueue(): Promise<QueueState> {
+  return invoke("start_queue");
 }
 
-/** Pauses the quests and stops their games; they go back to the front. */
-export function stopQuests(): Promise<QuestsState> {
-  return invoke("stop_quests");
+/** Pauses the queue and stops its running games; they go back to the front. */
+export function stopQueue(): Promise<QueueState> {
+  return invoke("stop_queue");
 }
 
-/** Mirrors `QUESTS_CHANGED_EVENT` in `src-tauri/src/lib.rs`. */
-export function onQuestsChanged(handler: () => void): Promise<UnlistenFn> {
-  return listen("quests-changed", () => handler());
+/** Mirrors `QUEUE_CHANGED_EVENT` in `src-tauri/src/lib.rs`. */
+export function onQueueChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen("queue-changed", () => handler());
 }

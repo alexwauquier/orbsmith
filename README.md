@@ -28,14 +28,14 @@ To update, run the installer of the new version. It detects the installed one an
 ## Usage
 
 1. Search for a game by name. Star the ones you use often: favorites and recently started games show up before you search.
-2. Click **Start**. Enter the quest duration: the game stops automatically once it has elapsed. Untick **Stop automatically** to keep it running until you stop it.
+2. Click **Start**, enter how long the game should run (for example, a quest duration), then **Start now**: the game stops automatically once that time has elapsed. Untick **Stop automatically** to keep it running until you stop it.
 3. The **Running** panel lists the active games with their remaining time. You can change the timer or stop a game at any time.
 
-### Quests
+### Queue
 
-To play several quests in a row, choose **Add to quests** instead of **Start now**: the game joins the **Quests** tab with its duration. **Start quests** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps it at the top of the list; stopping a quest's game from the **Running** tab skips to the next one.
+To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps it at the top of the list; stopping a queued game from the **Running** tab skips to the next one.
 
-To run every quest at the same time instead, turn on **Run quests in parallel** in the settings (gear icon in the header).
+To run every game in the queue at the same time instead, turn on **Run the queue in parallel** in the settings (gear icon in the header).
 
 Simulated games run in the background: they don't appear in the taskbar. A notification tells you when one stops on its own.
 

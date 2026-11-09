@@ -17,7 +17,7 @@ pub const PARENT_PID_ENV: &str = "ORBSMITH_PARENT_PID";
 /// crate.
 pub const TITLE_ENV: &str = "ORBSMITH_TITLE";
 
-/// Longest accepted auto-stop timer. Quests last minutes; without a timer a
+/// Longest accepted auto-stop timer. Typical timers last minutes; without a timer a
 /// simulation already runs until stopped.
 pub const MAX_DURATION: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 

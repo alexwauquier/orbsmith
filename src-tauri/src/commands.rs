@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use orbsmith_core::simulation::MAX_DURATION;
-use orbsmith_core::{AppSummary, Catalog, Os, Quest, QuestsState, Settings, SimulationInfo};
+use orbsmith_core::{AppSummary, Catalog, Os, QueueItem, QueueState, Settings, SimulationInfo};
 use serde::{Serialize, Serializer};
 use tauri::{AppHandle, State};
 
@@ -107,7 +107,7 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
     state.settings().clone()
 }
 
-/// Saves the settings. Switching to parallel quests starts the waiting ones.
+/// Saves the settings. Switching the queue to parallel starts the waiting games.
 #[tauri::command]
 pub async fn set_settings(
     handle: AppHandle,
@@ -116,23 +116,23 @@ pub async fn set_settings(
 ) -> CommandResult<Settings> {
     settings.save(&state.layout.settings_file())?;
     *state.settings() = settings.clone();
-    crate::quests::advance(&handle).await;
+    crate::queue::advance(&handle).await;
     Ok(settings)
 }
 
 #[tauri::command]
-pub fn list_quests(state: State<'_, AppState>) -> QuestsState {
-    state.quests().state()
+pub fn list_queue(state: State<'_, AppState>) -> QueueState {
+    state.queue().state()
 }
 
 /// Queues `app_id` to run for `duration_secs`, auto-stop margin included.
 #[tauri::command]
-pub async fn add_quest(
+pub async fn add_to_queue(
     handle: AppHandle,
     state: State<'_, AppState>,
     app_id: String,
     duration_secs: u64,
-) -> CommandResult<QuestsState> {
+) -> CommandResult<QueueState> {
     let duration = Duration::from_secs(duration_secs);
     if duration > MAX_DURATION {
         return Err(orbsmith_core::Error::TimerTooLong.into());
@@ -144,40 +144,44 @@ pub async fn add_quest(
     if app.target(Os::CURRENT).is_none() {
         return Err(orbsmith_core::Error::NoExecutable(app.name.clone()).into());
     }
-    state.quests().add(Quest {
+    state.queue().add(QueueItem {
         app_id: app.id.clone(),
         app_name: app.name.clone(),
         duration,
     })?;
-    crate::quests::advance(&handle).await;
-    crate::quests_changed(&handle);
-    Ok(state.quests().state())
+    crate::queue::advance(&handle).await;
+    crate::queue_changed(&handle);
+    Ok(state.queue().state())
 }
 
 #[tauri::command]
-pub fn remove_quest(handle: AppHandle, state: State<'_, AppState>, app_id: String) -> QuestsState {
-    state.quests().remove(&app_id);
-    crate::quests_changed(&handle);
-    state.quests().state()
-}
-
-#[tauri::command]
-pub async fn start_quests(
+pub fn remove_from_queue(
     handle: AppHandle,
     state: State<'_, AppState>,
-) -> CommandResult<QuestsState> {
-    state.quests().start();
-    crate::quests::advance(&handle).await;
-    crate::quests_changed(&handle);
-    Ok(state.quests().state())
+    app_id: String,
+) -> QueueState {
+    state.queue().remove(&app_id);
+    crate::queue_changed(&handle);
+    state.queue().state()
 }
 
-/// Pauses the quests and stops their games. They go back to the front of the
+#[tauri::command]
+pub async fn start_queue(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<QueueState> {
+    state.queue().start();
+    crate::queue::advance(&handle).await;
+    crate::queue_changed(&handle);
+    Ok(state.queue().state())
+}
+
+/// Pauses the queue and stops its running games. They go back to the front of the
 /// queue.
 #[tauri::command]
-pub fn stop_quests(handle: AppHandle, state: State<'_, AppState>) -> QuestsState {
-    crate::quests::stop(&handle);
-    state.quests().state()
+pub fn stop_queue(handle: AppHandle, state: State<'_, AppState>) -> QueueState {
+    crate::queue::stop(&handle);
+    state.queue().state()
 }
 
 pub(crate) async fn catalog(state: &AppState, refresh: bool) -> CommandResult<Arc<Catalog>> {

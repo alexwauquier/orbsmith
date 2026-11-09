@@ -26,16 +26,16 @@
     <Field.FieldGroup>
       <Field.Field orientation="horizontal">
         <Field.FieldContent>
-          <Field.FieldLabel for="quests-in-parallel">Run quests in parallel</Field.FieldLabel>
+          <Field.FieldLabel for="parallel-queue">Run the queue in parallel</Field.FieldLabel>
           <Field.FieldDescription>
-            Start every quest at once instead of one after another. Each quest still stops after its
-            own duration.
+            Start every game in the queue at once instead of one after another. Each one still stops
+            after its own duration.
           </Field.FieldDescription>
         </Field.FieldContent>
         <Switch
-          id="quests-in-parallel"
-          checked={settings.questsInParallel}
-          onCheckedChange={(questsInParallel) => onchange({ ...settings, questsInParallel })}
+          id="parallel-queue"
+          checked={settings.parallelQueue}
+          onCheckedChange={(parallelQueue) => onchange({ ...settings, parallelQueue })}
         />
       </Field.Field>
     </Field.FieldGroup>

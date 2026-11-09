@@ -6,18 +6,18 @@
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
   import XIcon from "@lucide/svelte/icons/x";
-  import type { AppSummary, Quest, QuestsState } from "$lib/api";
-  import { formatQuestDuration } from "$lib/time";
+  import type { AppSummary, QueueItem, QueueState } from "$lib/api";
+  import { formatDuration } from "$lib/time";
 
   let {
-    quests,
+    queue,
     parallel,
     appsById,
     onstart,
     onstop,
     onremove
   }: {
-    quests: QuestsState;
+    queue: QueueState;
     parallel: boolean;
     appsById: Map<string, AppSummary>;
     onstart: () => void;
@@ -25,24 +25,24 @@
     onremove: (appId: string) => void;
   } = $props();
 
-  const empty = $derived(quests.active.length === 0 && quests.queued.length === 0);
+  const empty = $derived(queue.active.length === 0 && queue.queued.length === 0);
 </script>
 
-{#snippet quest(quest: Quest, active: boolean, position: number)}
+{#snippet row(entry: QueueItem, active: boolean, position: number)}
   <Item.Root variant="outline" size="sm">
     <Item.Media variant="image">
       <AppIcon
         app={{
-          id: quest.appId,
-          name: quest.appName,
-          iconHash: appsById.get(quest.appId)?.iconHash ?? null
+          id: entry.appId,
+          name: entry.appName,
+          iconHash: appsById.get(entry.appId)?.iconHash ?? null
         }}
         class="size-full"
       />
     </Item.Media>
     <Item.Content class="min-w-0">
-      <Item.Title class="w-full truncate">{quest.appName}</Item.Title>
-      <Item.Description>{formatQuestDuration(quest.durationSecs)}</Item.Description>
+      <Item.Title class="w-full truncate">{entry.appName}</Item.Title>
+      <Item.Description>{formatDuration(entry.durationSecs)}</Item.Description>
     </Item.Content>
     <Item.Actions>
       {#if active}
@@ -52,8 +52,8 @@
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Remove {quest.appName} from the quests"
-          onclick={() => onremove(quest.appId)}
+          aria-label="Remove {entry.appName} from the queue"
+          onclick={() => onremove(entry.appId)}
         >
           <XIcon />
         </Button>
@@ -65,15 +65,15 @@
 <div class="flex flex-col gap-3">
   {#if empty}
     <p class="text-sm text-muted-foreground">
-      No quests yet. Choose a game, then <span class="font-medium">Add to quests</span> to queue it with
-      its quest duration.
+      The queue is empty. Choose a game, then <span class="font-medium">Add to queue</span> to queue it
+      with its duration.
     </p>
   {:else}
     <div class="flex items-center gap-2">
       <p class="text-xs text-muted-foreground">
         {parallel ? "All at once" : "One after another"}
       </p>
-      {#if quests.running}
+      {#if queue.running}
         <Button variant="outline" size="sm" class="ml-auto" onclick={onstop}>
           <PauseIcon data-icon="inline-start" />
           Pause
@@ -81,16 +81,16 @@
       {:else}
         <Button size="sm" class="ml-auto" onclick={onstart}>
           <PlayIcon data-icon="inline-start" />
-          Start quests
+          Start queue
         </Button>
       {/if}
     </div>
     <div class="flex flex-col gap-2">
-      {#each quests.active as item (item.appId)}
-        {@render quest(item, true, 0)}
+      {#each queue.active as item (item.appId)}
+        {@render row(item, true, 0)}
       {/each}
-      {#each quests.queued as item, index (item.appId)}
-        {@render quest(item, false, index + 1)}
+      {#each queue.queued as item, index (item.appId)}
+        {@render row(item, false, index + 1)}
       {/each}
     </div>
   {/if}

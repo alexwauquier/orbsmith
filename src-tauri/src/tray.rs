@@ -19,8 +19,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             SHOW => show_main_window(app),
             STOP_ALL => {
-                // Pause the quests first, or the next one would start.
-                crate::quests::stop(app);
+                // Pause the queue first, or its next game would start.
+                crate::queue::stop(app);
                 app.state::<AppState>().simulations().stop_all();
                 crate::simulations_changed(app);
             }
@@ -98,17 +98,17 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     }
     let remaining = {
         let state = app.state::<AppState>();
-        let quests = state.quests();
-        quests.is_running().then(|| quests.remaining())
+        let queue = state.queue();
+        queue.is_running().then(|| queue.remaining())
     };
     if let Some(remaining) = remaining {
         let label = match remaining {
-            1 => "Quests: 1 left".to_owned(),
-            n => format!("Quests: {n} left"),
+            1 => "Queue: 1 left".to_owned(),
+            n => format!("Queue: {n} left"),
         };
         builder = builder.separator().item(&MenuItem::with_id(
             app,
-            "quests",
+            "queue",
             label,
             false,
             None::<&str>,

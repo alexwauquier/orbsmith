@@ -1,6 +1,6 @@
 mod commands;
 mod notify;
-mod quests;
+mod queue;
 mod state;
 mod tray;
 
@@ -18,8 +18,8 @@ use crate::state::AppState;
 /// from the tray or on their own. Listeners reload the list.
 const SIMULATIONS_CHANGED_EVENT: &str = "simulations-changed";
 
-/// Emitted, without payload, whenever the quest queue changes.
-const QUESTS_CHANGED_EVENT: &str = "quests-changed";
+/// Emitted, without payload, whenever the queue changes.
+const QUEUE_CHANGED_EVENT: &str = "queue-changed";
 
 /// Whether the "still running in the tray" notification was already shown, so
 /// that it appears once per run.
@@ -83,11 +83,11 @@ pub fn run() -> tauri::Result<()> {
             commands::set_simulation_timer,
             commands::get_settings,
             commands::set_settings,
-            commands::list_quests,
-            commands::add_quest,
-            commands::remove_quest,
-            commands::start_quests,
-            commands::stop_quests,
+            commands::list_queue,
+            commands::add_to_queue,
+            commands::remove_from_queue,
+            commands::start_queue,
+            commands::stop_queue,
         ])
         .build(context)?
         .run(|app, event| {
@@ -129,15 +129,15 @@ pub(crate) fn simulations_changed(app: &AppHandle) {
     }
 }
 
-/// Updates the tray and tells the frontend to reload the quests.
-pub(crate) fn quests_changed(app: &AppHandle) {
+/// Updates the tray and tells the frontend to reload the queue.
+pub(crate) fn queue_changed(app: &AppHandle) {
     tray::refresh(app);
-    if let Err(err) = app.emit(QUESTS_CHANGED_EVENT, ()) {
-        log::warn!("failed to emit {QUESTS_CHANGED_EVENT}: {err}");
+    if let Err(err) = app.emit(QUEUE_CHANGED_EVENT, ()) {
+        log::warn!("failed to emit {QUEUE_CHANGED_EVENT}: {err}");
     }
 }
 
-/// Applies auto-stop timers, notices dummies that exited and moves the quest
+/// Applies auto-stop timers, notices dummies that exited and moves the
 /// queue on, once per second.
 async fn watch_simulations(app: AppHandle) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
@@ -153,6 +153,6 @@ async fn watch_simulations(app: AppHandle) {
             }
             simulations_changed(&app);
         }
-        quests::advance(&app).await;
+        queue::advance(&app).await;
     }
 }

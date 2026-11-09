@@ -1,5 +1,5 @@
-//! Runs the quest queue: starts the games it picks, reports failures, and
-//! announces when every quest is done.
+//! Runs the queue: starts the games it picks, reports failures, and announces
+//! when every game in it is done.
 
 use std::collections::HashSet;
 
@@ -11,7 +11,7 @@ use crate::notify;
 use crate::state::AppState;
 
 /// Lets the queue move on: called every second, and right after any change
-/// to the quests or the settings.
+/// to the queue or the settings.
 pub async fn advance(app: &AppHandle) {
     let state = app.state::<AppState>();
     let running: HashSet<String> = state
@@ -20,51 +20,51 @@ pub async fn advance(app: &AppHandle) {
         .into_iter()
         .map(|sim| sim.app_id)
         .collect();
-    let parallel = state.settings().quests_in_parallel;
-    let step = state.quests().next(&running, parallel);
+    let parallel = state.settings().parallel_queue;
+    let step = state.queue().next(&running, parallel);
     if !step.changed {
         return;
     }
 
     if !step.start.is_empty() {
         let catalog = commands::catalog(&state, false).await;
-        for quest in &step.start {
+        for item in &step.start {
             let result = match &catalog {
                 Err(err) => Err(err.message().to_owned()),
-                Ok(catalog) => match catalog.get(&quest.app_id) {
-                    None => Err(format!("{} is no longer in the game list", quest.app_name)),
+                Ok(catalog) => match catalog.get(&item.app_id) {
+                    None => Err(format!("{} is no longer in the game list", item.app_name)),
                     Some(detectable) => state
                         .simulations()
-                        .start(detectable, Os::CURRENT, Some(quest.duration))
+                        .start(detectable, Os::CURRENT, Some(item.duration))
                         .map(|_| ())
                         .map_err(|err| err.to_string()),
                 },
             };
             if let Err(message) = result {
                 log::warn!(
-                    "failed to start the quest for {}: {message}",
-                    quest.app_name
+                    "failed to start {} from the queue: {message}",
+                    item.app_name
                 );
-                state.quests().failed(&quest.app_id);
-                notify::quest_failed(app, &quest.app_name, &message);
+                state.queue().failed(&item.app_id);
+                notify::queue_item_failed(app, &item.app_name, &message);
             }
         }
         crate::simulations_changed(app);
     }
     if step.finished {
-        notify::quests_done(app);
+        notify::queue_finished(app);
     }
-    crate::quests_changed(app);
+    crate::queue_changed(app);
 }
 
-/// Pauses the queue and stops the games of its active quests.
+/// Pauses the queue and stops its running games.
 pub fn stop(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let stopped = state.quests().stop();
-    for quest in &stopped {
+    let stopped = state.queue().stop();
+    for item in &stopped {
         // Already gone if it ended in the meantime.
-        let _ = state.simulations().stop(&quest.app_id);
+        let _ = state.simulations().stop(&item.app_id);
     }
     crate::simulations_changed(app);
-    crate::quests_changed(app);
+    crate::queue_changed(app);
 }

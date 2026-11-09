@@ -12,7 +12,7 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Spinner } from "$lib/components/ui/spinner";
   import AppRow from "$lib/components/AppRow.svelte";
-  import QuestsPanel from "$lib/components/QuestsPanel.svelte";
+  import QueuePanel from "$lib/components/QueuePanel.svelte";
   import RunningCard from "$lib/components/RunningCard.svelte";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import StartDialog from "$lib/components/StartDialog.svelte";
@@ -27,20 +27,20 @@
   import {
     getApps,
     listSimulations,
-    addQuest,
+    addToQueue,
     getSettings,
-    listQuests,
-    onQuestsChanged,
+    listQueue,
+    onQueueChanged,
     onSimulationsChanged,
-    removeQuest,
+    removeFromQueue,
     setSettings,
-    startQuests,
-    stopQuests,
+    startQueue,
+    stopQueue,
     setSimulationTimer,
     startSimulation,
     stopSimulation,
     type AppSummary,
-    type QuestsState,
+    type QueueState,
     type Settings,
     type Simulation
   } from "$lib/api";
@@ -63,8 +63,8 @@
   let now = $state(Date.now());
   let starting = $state<AppSummary | null>(null);
   let editingTimer = $state<Simulation | null>(null);
-  let quests = $state.raw<QuestsState>({ running: false, active: [], queued: [] });
-  let settings = $state.raw<Settings>({ questsInParallel: false });
+  let queue = $state.raw<QueueState>({ running: false, active: [], queued: [] });
+  let settings = $state.raw<Settings>({ parallelQueue: false });
   let settingsOpen = $state(false);
   let sideTab = $state("running");
 
@@ -72,7 +72,7 @@
   const appsById = $derived(new Map(apps.map((app) => [app.id, app])));
   const runningIds = $derived(new Set(simulations.map((sim) => sim.appId)));
 
-  const questCount = $derived(quests.active.length + quests.queued.length);
+  const queueCount = $derived(queue.active.length + queue.queued.length);
 
   const library = new LibraryStore();
   const favoriteApps = $derived(resolveApps(library.favorites, appsById));
@@ -144,20 +144,20 @@
     if (ok) editingTimer = null;
   }
 
-  async function reloadQuests() {
+  async function reloadQueue() {
     await attempt(async () => {
-      quests = await listQuests();
+      queue = await listQueue();
     });
   }
 
-  async function queueQuest(app: AppSummary, durationSecs: number) {
+  async function enqueue(app: AppSummary, durationSecs: number) {
     const ok = await attempt(async () => {
-      quests = await addQuest(app.id, durationSecs);
+      queue = await addToQueue(app.id, durationSecs);
     });
     if (ok) {
       starting = null;
       library.markUsed(app.id);
-      sideTab = "quests";
+      sideTab = "queue";
     }
   }
 
@@ -171,7 +171,7 @@
     void Promise.all([
       loadApps(false),
       reloadSimulations(),
-      reloadQuests(),
+      reloadQueue(),
       attempt(async () => {
         settings = await getSettings();
       })
@@ -180,7 +180,7 @@
     const tick = setInterval(() => (now = Date.now()), 1000);
     const listeners = [
       onSimulationsChanged(() => void reloadSimulations()),
-      onQuestsChanged(() => void reloadQuests())
+      onQueueChanged(() => void reloadQueue())
     ];
     return () => {
       clearInterval(tick);
@@ -345,10 +345,10 @@
               <Badge variant="secondary">{simulations.length}</Badge>
             {/if}
           </Tabs.Trigger>
-          <Tabs.Trigger value="quests">
-            Quests
-            {#if questCount > 0}
-              <Badge variant="secondary">{questCount}</Badge>
+          <Tabs.Trigger value="queue">
+            Queue
+            {#if queueCount > 0}
+              <Badge variant="secondary">{queueCount}</Badge>
             {/if}
           </Tabs.Trigger>
         </Tabs.List>
@@ -371,23 +371,23 @@
             {/if}
           </ScrollArea>
         </Tabs.Content>
-        <Tabs.Content value="quests" class="min-h-0">
+        <Tabs.Content value="queue" class="min-h-0">
           <ScrollArea class="h-full">
-            <QuestsPanel
-              {quests}
-              parallel={settings.questsInParallel}
+            <QueuePanel
+              {queue}
+              parallel={settings.parallelQueue}
               {appsById}
               onstart={() =>
                 void attempt(async () => {
-                  quests = await startQuests();
+                  queue = await startQueue();
                 })}
               onstop={() =>
                 void attempt(async () => {
-                  quests = await stopQuests();
+                  queue = await stopQueue();
                 })}
               onremove={(appId) =>
                 void attempt(async () => {
-                  quests = await removeQuest(appId);
+                  queue = await removeFromQueue(appId);
                 })}
             />
           </ScrollArea>
@@ -397,12 +397,7 @@
   </div>
 </div>
 
-<StartDialog
-  app={starting}
-  onclose={() => (starting = null)}
-  onstart={start}
-  onaddquest={queueQuest}
-/>
+<StartDialog app={starting} onclose={() => (starting = null)} onstart={start} onenqueue={enqueue} />
 <SettingsDialog
   bind:open={settingsOpen}
   {settings}

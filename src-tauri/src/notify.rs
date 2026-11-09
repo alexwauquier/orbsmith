@@ -13,19 +13,19 @@ pub fn simulation_ended(app: &AppHandle, ended: &Ended) {
     show(app, &format!("{} stopped", ended.app_name), body);
 }
 
-pub fn quest_failed(app: &AppHandle, app_name: &str, reason: &str) {
+pub fn queue_item_failed(app: &AppHandle, app_name: &str, reason: &str) {
     show(
         app,
         &format!("Could not start {app_name}"),
-        &format!("{reason}. Moving on to the next quest."),
+        &format!("{reason}. Moving on to the next game in the queue."),
     );
 }
 
-pub fn quests_done(app: &AppHandle) {
+pub fn queue_finished(app: &AppHandle) {
     show(
         app,
-        "Quests done",
-        "Every quest has run for its full duration.",
+        "Queue finished",
+        "Every game in the queue has run for its full duration.",
     );
 }
 

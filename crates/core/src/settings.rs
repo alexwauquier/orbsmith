@@ -11,8 +11,8 @@ use crate::error::Error;
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
-    /// Start every queued quest at once instead of one after another.
-    pub quests_in_parallel: bool,
+    /// Start every queued game at once instead of one after another.
+    pub parallel_queue: bool,
 }
 
 impl Settings {
@@ -48,7 +48,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let settings = Settings::load(&dir.path().join("settings.json")).unwrap();
         assert_eq!(settings, Settings::default());
-        assert!(!settings.quests_in_parallel);
+        assert!(!settings.parallel_queue);
     }
 
     #[test]
@@ -56,7 +56,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("nested").join("settings.json");
         let settings = Settings {
-            quests_in_parallel: true,
+            parallel_queue: true,
         };
         settings.save(&file).unwrap();
         assert_eq!(Settings::load(&file).unwrap(), settings);

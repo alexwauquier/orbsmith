@@ -13,28 +13,27 @@
     app,
     onclose,
     onstart,
-    onaddquest
+    onenqueue
   }: {
     app: AppSummary | null;
     onclose: () => void;
     /** Resolves once the simulation started; the dialog stays open on error. */
     onstart: (app: AppSummary, durationSecs: number | undefined) => Promise<void>;
-    /** Resolves once the quest is queued; the dialog stays open on error. */
-    onaddquest: (app: AppSummary, durationSecs: number) => Promise<void>;
+    /** Resolves once the game is queued; the dialog stays open on error. */
+    onenqueue: (app: AppSummary, durationSecs: number) => Promise<void>;
   } = $props();
 
-  const maxQuestMinutes = Math.floor((MAX_TIMER_MINUTES * 60 - DETECTION_DELAY_SECS) / 60);
+  const maxMinutes = Math.floor((MAX_TIMER_MINUTES * 60 - DETECTION_DELAY_SECS) / 60);
 
-  let questMinutes = $state(15);
+  let minutes = $state(15);
   let autoStop = $state(true);
   let busy = $state(false);
 
   const valid = $derived(
-    !autoStop ||
-      (Number.isInteger(questMinutes) && questMinutes >= 1 && questMinutes <= maxQuestMinutes)
+    !autoStop || (Number.isInteger(minutes) && minutes >= 1 && minutes <= maxMinutes)
   );
 
-  const durationSecs = $derived(questMinutes * 60 + DETECTION_DELAY_SECS);
+  const durationSecs = $derived(minutes * 60 + DETECTION_DELAY_SECS);
 
   async function run(action: () => Promise<void>) {
     busy = true;
@@ -52,10 +51,10 @@
     void run(() => onstart(target, autoStop ? durationSecs : undefined));
   }
 
-  function addQuest() {
+  function addToQueue() {
     const target = app;
     if (!target || !valid || !autoStop) return;
-    void run(() => onaddquest(target, durationSecs));
+    void run(() => onenqueue(target, durationSecs));
   }
 </script>
 
@@ -86,20 +85,20 @@
             <Field.FieldLabel for="auto-stop">Stop automatically</Field.FieldLabel>
           </Field.Field>
           <Field.Field data-invalid={!valid || undefined} data-disabled={!autoStop || undefined}>
-            <Field.FieldLabel for="quest-minutes">Quest duration (minutes)</Field.FieldLabel>
+            <Field.FieldLabel for="duration-minutes">Duration (minutes)</Field.FieldLabel>
             <Input
-              id="quest-minutes"
+              id="duration-minutes"
               type="number"
               min={1}
-              max={maxQuestMinutes}
+              max={maxMinutes}
               step={1}
-              bind:value={questMinutes}
+              bind:value={minutes}
               disabled={!autoStop}
               aria-invalid={!valid || undefined}
             />
             <Field.FieldDescription>
               {#if autoStop}
-                Stops after {questMinutes || 0} minutes.
+                Stops after {minutes || 0} minutes.
               {:else}
                 Runs until you stop it.
               {/if}
@@ -109,15 +108,15 @@
 
         <Dialog.Footer>
           <Button type="button" variant="outline" onclick={onclose}>Cancel</Button>
-          <!-- A quest needs a duration, so it requires the auto-stop timer. -->
+          <!-- A queued game needs a duration, so it requires the auto-stop timer. -->
           <Button
             type="button"
             variant="secondary"
             disabled={!valid || !autoStop || busy}
-            onclick={addQuest}
+            onclick={addToQueue}
           >
             <ListPlusIcon data-icon="inline-start" />
-            Add to quests
+            Add to queue
           </Button>
           <Button type="submit" disabled={!valid || busy}>
             {#if busy}

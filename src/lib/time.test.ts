@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAgo, formatCountdown, formatQuestDuration } from "$lib/time";
+import { formatAgo, formatCountdown, formatDuration } from "$lib/time";
 
 describe("formatCountdown", () => {
   it("formats minutes and seconds", () => {
@@ -36,14 +36,14 @@ describe("formatAgo", () => {
   });
 });
 
-describe("formatQuestDuration", () => {
+describe("formatDuration", () => {
   it("shows whole minutes, ignoring the auto-stop margin", () => {
-    expect(formatQuestDuration(15 * 60 + 1)).toBe("15 min");
-    expect(formatQuestDuration(61)).toBe("1 min");
+    expect(formatDuration(15 * 60 + 1)).toBe("15 min");
+    expect(formatDuration(61)).toBe("1 min");
   });
 
   it("adds hours from an hour on", () => {
-    expect(formatQuestDuration(90 * 60 + 1)).toBe("1 h 30 min");
-    expect(formatQuestDuration(2 * 3600 + 1)).toBe("2 h");
+    expect(formatDuration(90 * 60 + 1)).toBe("1 h 30 min");
+    expect(formatDuration(2 * 3600 + 1)).toBe("2 h");
   });
 });

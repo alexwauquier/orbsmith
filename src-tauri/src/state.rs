@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use orbsmith_core::{Catalog, Layout, QuestQueue, Settings, Simulations};
+use orbsmith_core::{Catalog, Layout, Queue, Settings, Simulations};
 
 pub struct AppState {
     pub layout: Layout,
@@ -9,7 +9,7 @@ pub struct AppState {
     /// download instead of each starting their own.
     pub catalog: tokio::sync::Mutex<Option<Arc<Catalog>>>,
     simulations: Mutex<Simulations>,
-    quests: Mutex<QuestQueue>,
+    queue: Mutex<Queue>,
     settings: Mutex<Settings>,
 }
 
@@ -20,7 +20,7 @@ impl AppState {
             layout,
             catalog: tokio::sync::Mutex::new(None),
             simulations: Mutex::new(simulations),
-            quests: Mutex::new(QuestQueue::new()),
+            queue: Mutex::new(Queue::new()),
             settings: Mutex::new(settings),
         }
     }
@@ -35,8 +35,8 @@ impl AppState {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    pub fn quests(&self) -> MutexGuard<'_, QuestQueue> {
-        self.quests
+    pub fn queue(&self) -> MutexGuard<'_, Queue> {
+        self.queue
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
