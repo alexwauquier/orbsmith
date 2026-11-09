@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata, read by software centers for the deb and rpm packages. -->
+<component type="desktop-application">
+  <id>io.github.alexwauquier.orbsmith</id>
+  <!-- Tauri names the desktop entry after productName. -->
+  <launchable type="desktop-id">Orbsmith.desktop</launchable>
+
+  <name>Orbsmith</name>
+  <summary>Launch stand-in processes named after games</summary>
+  <developer id="io.github.alexwauquier">
+    <name>Alex Wauquier</name>
+  </developer>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <description>
+    <p>
+      Orbsmith launches stand-in processes named after game executables, so that
+      software detecting running games sees them as launched.
+    </p>
+    <ul>
+      <li>Search the public list of detectable games, with their icons</li>
+      <li>Run a game for a set time, or until you stop it</li>
+      <li>Queue several games to run one after another or all at once</li>
+      <li>Keep running from the system tray while the window is closed</li>
+    </ul>
+    <p>
+      Orbsmith is not affiliated with any software or game publisher. Using it
+      may go against the terms of service of the software that detects running
+      games.
+    </p>
+  </description>
+
+  <categories>
+    <category>Utility</category>
+  </categories>
+
+  <url type="homepage">https://github.com/alexwauquier/orbsmith</url>
+  <url type="bugtracker">https://github.com/alexwauquier/orbsmith/issues</url>
+  <url type="vcs-browser">https://github.com/alexwauquier/orbsmith</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Two games running</caption>
+      <image>https://raw.githubusercontent.com/alexwauquier/orbsmith/main/docs/screenshots/main.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Starting a game for a set time</caption>
+      <image>https://raw.githubusercontent.com/alexwauquier/orbsmith/main/docs/screenshots/start-dialog.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The queue</caption>
+      <image>https://raw.githubusercontent.com/alexwauquier/orbsmith/main/docs/screenshots/queue.png</image>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1"/>
+
+  <!-- Newest first. The release workflow checks that the tagged version is listed. -->
+  <releases>
+    <release version="0.4.0" date="2026-11-09">
+      <url type="details">https://github.com/alexwauquier/orbsmith/releases/tag/v0.4.0</url>
+    </release>
+    <release version="0.3.0" date="2026-11-09">
+      <url type="details">https://github.com/alexwauquier/orbsmith/releases/tag/v0.3.0</url>
+    </release>
+    <release version="0.2.0" date="2026-11-09">
+      <url type="details">https://github.com/alexwauquier/orbsmith/releases/tag/v0.2.0</url>
+    </release>
+    <release version="0.1.0" date="2026-11-09">
+      <url type="details">https://github.com/alexwauquier/orbsmith/releases/tag/v0.1.0</url>
+    </release>
+  </releases>
+</component>
