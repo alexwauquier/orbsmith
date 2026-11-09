@@ -12,6 +12,10 @@ Desktop app that launches stand-in processes named after game executables, so th
 > [!WARNING]
 > Using Orbsmith may go against the terms of service of the software that detects running games. Use it at your own risk.
 
+![Orbsmith with two games running](docs/screenshots/main.png)
+
+<sub>Orbsmith is not affiliated with any of the games shown.</sub>
+
 ## Installation
 
 Orbsmith currently runs on Windows 10 and 11 (x64). Linux support is planned.
@@ -31,9 +35,13 @@ To update, run the installer of the new version. It detects the installed one an
 2. Click **Start**, enter how long the game should run (for example, a quest duration), then **Start now**: the game stops automatically once that time has elapsed. Untick **Stop automatically** to keep it running until you stop it. If a game lists several executables and isn't detected, pick another one in **Executable**. Orbsmith remembers the duration and executable you last used for each game.
 3. The **Running** panel lists the active games with their remaining time. You can change the timer or stop a game at any time.
 
+![The start dialog](docs/screenshots/start-dialog.png)
+
 ### Queue
 
 To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. Reorder it with the arrows, or empty it with the bin button. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps its remaining time: **Resume** restarts it for just that long, then carries on with the queue. **Stop all** in the tray menu pauses the queue the same way. Stopping a queued game from the **Running** tab skips to the next one. The queue is saved: after closing Orbsmith, it comes back paused, ready to resume.
+
+![The queue, running its first game](docs/screenshots/queue.png)
 
 To run every game in the queue at the same time instead, turn on **Run the queue in parallel** in the settings (gear icon in the header).
 
