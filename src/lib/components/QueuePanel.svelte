@@ -7,7 +7,7 @@
   import PlayIcon from "@lucide/svelte/icons/play";
   import XIcon from "@lucide/svelte/icons/x";
   import type { AppSummary, QueueItem, QueueState } from "$lib/api";
-  import { formatDuration } from "$lib/time";
+  import { formatCountdown, formatDuration } from "$lib/time";
 
   let {
     queue,
@@ -42,7 +42,13 @@
     </Item.Media>
     <Item.Content class="min-w-0">
       <Item.Title class="w-full truncate">{entry.appName}</Item.Title>
-      <Item.Description>{formatDuration(entry.durationSecs)}</Item.Description>
+      <Item.Description class="tabular-nums">
+        {#if entry.leftSecs !== null && !active}
+          {formatCountdown(entry.leftSecs * 1000)} left of {formatDuration(entry.durationSecs)}
+        {:else}
+          {formatDuration(entry.durationSecs)}
+        {/if}
+      </Item.Description>
     </Item.Content>
     <Item.Actions>
       {#if active}

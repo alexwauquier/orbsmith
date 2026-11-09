@@ -1,7 +1,8 @@
 //! Runs the queue: starts the games it picks, reports failures, and announces
 //! when every game in it is done.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use orbsmith_core::Os;
 use tauri::{AppHandle, Manager};
@@ -35,7 +36,7 @@ pub async fn advance(app: &AppHandle) {
                     None => Err(format!("{} is no longer in the game list", item.app_name)),
                     Some(detectable) => state
                         .simulations()
-                        .start(detectable, Os::CURRENT, Some(item.duration))
+                        .start(detectable, Os::CURRENT, Some(item.run_time()))
                         .map(|_| ())
                         .map_err(|err| err.to_string()),
                 },
@@ -57,11 +58,24 @@ pub async fn advance(app: &AppHandle) {
     crate::queue_changed(app);
 }
 
-/// Interrupts the queue and stops its running games, which go back to the
-/// front. Used by Stop all; the queue can then be resumed.
-pub fn stop(app: &AppHandle) {
+/// Pauses the queue: its running games stop and go back to the front with
+/// the time their timer had left, so they resume where they stopped.
+pub fn pause(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let stopped = state.queue().stop();
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis());
+    let left: HashMap<String, Duration> = state
+        .simulations()
+        .list()
+        .into_iter()
+        .filter_map(|sim| {
+            let stop_at = u128::from(sim.stop_at?);
+            let left_ms = u64::try_from(stop_at.saturating_sub(now_ms)).ok()?;
+            Some((sim.app_id, Duration::from_millis(left_ms)))
+        })
+        .collect();
+    let stopped = state.queue().pause(&left);
     for item in &stopped {
         // Already gone if it ended in the meantime.
         let _ = state.simulations().stop(&item.app_id);

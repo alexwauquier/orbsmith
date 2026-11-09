@@ -4,7 +4,7 @@
 //! The queue only decides what to start. The caller owns the simulations: it
 //! starts what [`Queue::next`] returns and reports failures back.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -17,6 +17,26 @@ pub struct QueueItem {
     pub app_name: String,
     /// How long the game runs.
     pub duration: Duration,
+    /// Time left after a pause interrupted the game; it runs for this long
+    /// when resumed.
+    pub left: Option<Duration>,
+}
+
+impl QueueItem {
+    pub fn new(app_id: impl Into<String>, app_name: impl Into<String>, duration: Duration) -> Self {
+        Self {
+            app_id: app_id.into(),
+            app_name: app_name.into(),
+            duration,
+            left: None,
+        }
+    }
+
+    /// How long the game should run when started: the time left after a
+    /// pause, or the whole duration.
+    pub fn run_time(&self) -> Duration {
+        self.left.unwrap_or(self.duration)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -25,6 +45,8 @@ pub struct QueueItemInfo {
     pub app_id: String,
     pub app_name: String,
     pub duration_secs: u64,
+    /// Time left after a pause, if the game was interrupted.
+    pub left_secs: Option<u64>,
 }
 
 impl From<&QueueItem> for QueueItemInfo {
@@ -33,6 +55,7 @@ impl From<&QueueItem> for QueueItemInfo {
             app_id: item.app_id.clone(),
             app_name: item.app_name.clone(),
             duration_secs: item.duration.as_secs(),
+            left_secs: item.left.map(|left| left.as_secs()),
         }
     }
 }
@@ -97,24 +120,25 @@ impl Queue {
         self.paused = false;
     }
 
-    /// Stops starting new items. Active items keep their game and timer; when
-    /// they end, the queue waits for [`Queue::start`].
-    pub fn pause(&mut self) {
-        if self.running {
-            self.running = false;
-            self.paused = true;
-        }
-    }
-
-    /// Interrupts the queue. Active items go back to the front, in order, and
-    /// are returned so the caller can stop their games.
-    pub fn stop(&mut self) -> Vec<QueueItem> {
-        self.running = false;
-        self.paused = self.remaining() > 0;
+    /// Pauses the queue. Active items go back to the front, in order, keeping
+    /// the time `left` for their game so they resume where they stopped; an
+    /// item with no time left is done. Returns the items that were active, so
+    /// the caller can stop their games. [`Queue::start`] resumes.
+    pub fn pause(&mut self, left: &HashMap<String, Duration>) -> Vec<QueueItem> {
+        let was_active = self.running || !self.active.is_empty();
         let active = std::mem::take(&mut self.active);
-        for item in active.iter().rev() {
-            self.queued.push_front(item.clone());
+        let interrupted = active.iter().filter_map(|item| {
+            let time = left.get(&item.app_id).filter(|time| !time.is_zero())?;
+            Some(QueueItem {
+                left: Some(*time),
+                ..item.clone()
+            })
+        });
+        for item in interrupted.collect::<Vec<_>>().into_iter().rev() {
+            self.queued.push_front(item);
         }
+        self.running = false;
+        self.paused = was_active && !self.queued.is_empty();
         active
     }
 
@@ -207,11 +231,14 @@ mod tests {
     use super::*;
 
     fn item(id: &str) -> QueueItem {
-        QueueItem {
-            app_id: id.to_owned(),
-            app_name: format!("Game {id}"),
-            duration: Duration::from_secs(60),
-        }
+        QueueItem::new(id, format!("Game {id}"), Duration::from_secs(60))
+    }
+
+    fn left(entries: &[(&str, u64)]) -> HashMap<String, Duration> {
+        entries
+            .iter()
+            .map(|(id, secs)| ((*id).to_owned(), Duration::from_secs(*secs)))
+            .collect()
     }
 
     fn queue(ids: &[&str]) -> Queue {
@@ -300,71 +327,74 @@ mod tests {
     }
 
     #[test]
-    fn stopping_puts_active_items_back_in_front() {
+    fn pausing_keeps_the_time_left_and_resumes_with_it() {
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        assert_eq!(started(&queue.next(&running(&[]), false)), ["a"]);
+
+        let stopped = queue.pause(&left(&[("a", 42)]));
+        assert_eq!(stopped.len(), 1, "a's game must be stopped");
+        assert!(queue.is_paused() && !queue.is_running());
+        let state = queue.state();
+        assert!(state.active.is_empty());
+        assert_eq!(state.queued[0].app_id, "a");
+        assert_eq!(state.queued[0].left_secs, Some(42));
+        assert!(
+            queue.next(&running(&[]), false).start.is_empty(),
+            "nothing starts"
+        );
+
+        queue.start();
+        assert!(!queue.is_paused());
+        let step = queue.next(&running(&[]), false);
+        assert_eq!(started(&step), ["a"]);
+        assert_eq!(step.start[0].run_time(), Duration::from_secs(42));
+    }
+
+    #[test]
+    fn pausing_in_parallel_keeps_every_game_in_order() {
         let mut queue = queue(&["a", "b", "c"]);
         queue.start();
         queue.next(&running(&[]), true);
         queue.add(item("d")).unwrap();
 
-        let stopped = queue.stop();
+        let stopped = queue.pause(&left(&[("a", 10), ("b", 20), ("c", 30)]));
         assert_eq!(stopped.len(), 3);
-        assert!(!queue.is_running());
-        let order: Vec<_> = queue.state().queued.into_iter().map(|q| q.app_id).collect();
+        let state = queue.state();
+        let order: Vec<_> = state.queued.iter().map(|q| q.app_id.as_str()).collect();
         assert_eq!(order, ["a", "b", "c", "d"]);
-        assert!(queue.next(&running(&[]), false).start.is_empty());
-        assert!(queue.is_paused(), "stopped items can be resumed");
+        assert_eq!(state.queued[3].left_secs, None);
     }
 
     #[test]
-    fn pausing_keeps_the_running_game_and_waits() {
-        let mut queue = queue(&["a", "b"]);
-        queue.start();
-        assert_eq!(started(&queue.next(&running(&[]), false)), ["a"]);
-
-        queue.pause();
-        assert!(queue.is_paused() && !queue.is_running());
-        assert_eq!(queue.state().active[0].app_id, "a", "a keeps running");
-        assert_eq!(queue.next(&running(&["a"]), false), Step::default());
-
-        // "a" ends while paused: it is done, and "b" waits.
-        let step = queue.next(&running(&[]), false);
-        assert!(step.start.is_empty() && step.changed && !step.finished);
-        assert_eq!(queue.remaining(), 1);
-        assert!(queue.is_paused());
-
-        queue.start();
-        assert!(!queue.is_paused());
-        assert_eq!(started(&queue.next(&running(&[]), false)), ["b"]);
-    }
-
-    #[test]
-    fn resuming_while_the_game_still_runs_keeps_its_place() {
+    fn an_item_with_no_time_left_is_done_when_paused() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
         queue.next(&running(&[]), false);
-        queue.pause();
-        queue.start();
-        // "a" is still active, so "b" keeps waiting for it.
-        assert!(queue.next(&running(&["a"]), false).start.is_empty());
-        assert_eq!(started(&queue.next(&running(&[]), false)), ["b"]);
+        queue.pause(&left(&[("a", 0)]));
+        let order: Vec<_> = queue.state().queued.into_iter().map(|q| q.app_id).collect();
+        assert_eq!(order, ["b"]);
     }
 
     #[test]
     fn a_pause_with_nothing_left_clears_itself() {
-        let mut queue = queue(&["a"]);
+        let mut queue = queue(&["a", "b"]);
         queue.start();
         queue.next(&running(&[]), false);
-        queue.pause();
+        queue.pause(&left(&[("a", 5)]));
+        queue.remove("a");
+        queue.remove("b");
         let step = queue.next(&running(&[]), false);
         assert!(step.changed && !step.finished);
-        assert!(!queue.is_paused() && queue.remaining() == 0);
+        assert!(!queue.is_paused());
     }
 
     #[test]
     fn pausing_an_idle_queue_does_nothing() {
         let mut queue = queue(&["a"]);
-        queue.pause();
+        assert!(queue.pause(&left(&[])).is_empty());
         assert!(!queue.is_paused());
+        assert_eq!(queue.remaining(), 1);
     }
 
     #[test]
@@ -397,6 +427,7 @@ mod tests {
                     app_id: "a".into(),
                     app_name: "Game a".into(),
                     duration_secs: 60,
+                    left_secs: None,
                 }],
             }
         );

@@ -40,13 +40,15 @@ export interface QueueItem {
   appName: string;
   /** How long the game runs. */
   durationSecs: number;
+  /** Time left after a pause interrupted the game, used when it resumes. */
+  leftSecs: number | null;
 }
 
 /** Mirrors `orbsmith_core::QueueState`. */
 export interface QueueState {
   /** Whether the queue is being worked through. */
   running: boolean;
-  /** Paused with items left: running games keep going, nothing new starts. */
+  /** Paused with items left; `startQueue` resumes. */
   paused: boolean;
   /** Items whose game is running. */
   active: QueueItem[];
@@ -122,7 +124,10 @@ export function startQueue(): Promise<QueueState> {
   return invoke("start_queue");
 }
 
-/** Running games keep their timer; nothing new starts until `startQueue`. */
+/**
+ * Stops the running games, keeping their time left: they go back to the
+ * front and resume where they stopped with `startQueue`.
+ */
 export function pauseQueue(): Promise<QueueState> {
   return invoke("pause_queue");
 }

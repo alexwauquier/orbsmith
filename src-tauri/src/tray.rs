@@ -19,8 +19,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             SHOW => show_main_window(app),
             STOP_ALL => {
-                // Pause the queue first, or its next game would start.
-                crate::queue::stop(app);
+                // Pause the queue first, or its next game would start. Its
+                // games keep their time left for when it is resumed.
+                crate::queue::pause(app);
                 app.state::<AppState>().simulations().stop_all();
                 crate::simulations_changed(app);
             }

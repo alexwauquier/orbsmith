@@ -144,11 +144,9 @@ pub async fn add_to_queue(
     if app.target(Os::CURRENT).is_none() {
         return Err(orbsmith_core::Error::NoExecutable(app.name.clone()).into());
     }
-    state.queue().add(QueueItem {
-        app_id: app.id.clone(),
-        app_name: app.name.clone(),
-        duration,
-    })?;
+    state
+        .queue()
+        .add(QueueItem::new(app.id.clone(), app.name.clone(), duration))?;
     crate::queue::advance(&handle).await;
     crate::queue_changed(&handle);
     Ok(state.queue().state())
@@ -180,8 +178,7 @@ pub async fn start_queue(
 /// until `start_queue` resumes it.
 #[tauri::command]
 pub fn pause_queue(handle: AppHandle, state: State<'_, AppState>) -> QueueState {
-    state.queue().pause();
-    crate::queue_changed(&handle);
+    crate::queue::pause(&handle);
     state.queue().state()
 }
 
