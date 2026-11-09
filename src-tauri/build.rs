@@ -75,5 +75,19 @@ fn copy_if_changed(from: &Path, to: &Path) -> BuildResult {
     if fs::read(to).ok().as_ref() != Some(&new) {
         fs::write(to, new)?;
     }
+    make_executable(to)
+}
+
+/// `fs::write` creates files without the execute bit, and every later copy of
+/// the sidecar, by Tauri and then by Orbsmith for each game, keeps that mode.
+#[cfg(unix)]
+fn make_executable(path: &Path) -> BuildResult {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &Path) -> BuildResult {
     Ok(())
 }
