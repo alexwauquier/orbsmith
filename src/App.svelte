@@ -74,6 +74,7 @@
   const runningIds = $derived(new Set(simulations.map((sim) => sim.appId)));
 
   const queueCount = $derived(queue.active.length + queue.queued.length);
+  const queuedIds = $derived(new Set(queue.queued.map((item) => item.appId)));
 
   const library = new LibraryStore();
   const favoriteApps = $derived(resolveApps(library.favorites, appsById));
@@ -201,6 +202,7 @@
   <AppRow
     {app}
     running={runningIds.has(app.id)}
+    queued={queuedIds.has(app.id)}
     favorite={library.isFavorite(app.id)}
     onstart={() => (starting = app)}
     ontogglefavorite={() => library.toggleFavorite(app.id)}

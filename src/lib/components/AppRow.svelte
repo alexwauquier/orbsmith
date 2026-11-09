@@ -10,12 +10,15 @@
   let {
     app,
     running,
+    queued,
     favorite,
     onstart,
     ontogglefavorite
   }: {
     app: AppSummary;
     running: boolean;
+    /** Waiting in the queue; a running queued game shows as running. */
+    queued: boolean;
     favorite: boolean;
     onstart: () => void;
     ontogglefavorite: () => void;
@@ -43,6 +46,9 @@
     {#if running}
       <Badge variant="secondary">Running</Badge>
     {:else}
+      {#if queued}
+        <Badge variant="outline">In queue</Badge>
+      {/if}
       <Button variant="secondary" size="sm" onclick={onstart}>
         <PlayIcon data-icon="inline-start" />
         Start
