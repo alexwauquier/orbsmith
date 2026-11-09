@@ -253,7 +253,7 @@ impl Drop for Simulations {
 /// Spawns `command`, retrying briefly on "text file busy". On Linux, a process
 /// forked by another thread while the dummy copy was still open for writing
 /// keeps that handle until it execs, which makes exec of the copy fail.
-fn spawn(command: &mut Command) -> std::io::Result<Child> {
+pub(crate) fn spawn(command: &mut Command) -> std::io::Result<Child> {
     let mut attempts = 0;
     loop {
         match command.spawn() {

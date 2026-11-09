@@ -93,10 +93,10 @@ mod tests {
             "orphan"
         });
         std::fs::copy(test_binary(), &exe).unwrap();
-        let mut child = Command::new(&exe)
-            .args(HELPER_ARGS.split_whitespace())
-            .spawn()
-            .unwrap();
+        // Through the retrying spawn: other tests fork while the copy is open.
+        let mut child =
+            crate::simulation::spawn(Command::new(&exe).args(HELPER_ARGS.split_whitespace()))
+                .unwrap();
         assert!(is_alive(child.id()));
 
         assert_eq!(kill_orphans(dir.path()), 1);
