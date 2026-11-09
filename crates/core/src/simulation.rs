@@ -47,6 +47,7 @@ pub enum EndReason {
 #[serde(rename_all = "camelCase")]
 pub struct Ended {
     pub app_id: String,
+    pub app_name: String,
     pub reason: EndReason,
 }
 
@@ -232,6 +233,7 @@ impl Simulations {
             };
             ended.push(Ended {
                 app_id: app_id.clone(),
+                app_name: running.info.app_name.clone(),
                 reason,
             });
         }
@@ -370,6 +372,7 @@ mod tests {
             ended,
             [Ended {
                 app_id: "42".into(),
+                app_name: "Game".into(),
                 reason: EndReason::Timer
             }]
         );
