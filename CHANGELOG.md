@@ -7,15 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- The auto-stop timer runs for exactly the duration entered, without an extra second.
+## [0.3.0] - 2026-11-09
 
 ### Added
 
-- Queue: add games with a duration, then let Orbsmith run them one after another, even while the window is hidden in the tray.
+- Queue: add games with a duration, then let Orbsmith run them one after another, even while the window is hidden in the tray. Pausing stops the current game and keeps its time left for when the queue resumes.
 - Settings window, with an option to run the queue in parallel instead.
 - Notifications when the queue is finished, or when one of its games cannot start.
+
+### Changed
+
+- The auto-stop timer runs for exactly the duration entered, without an extra second.
 
 ## [0.2.0] - 2026-11-09
 
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stand-in processes are stopped when Orbsmith exits, exit on their own if it crashes, and leftovers are cleaned up at startup.
 - Windows installers (`setup.exe` and MSI). The `setup.exe` uninstaller can delete the app data.
 
-[Unreleased]: https://github.com/alexwauquier/orbsmith/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/alexwauquier/orbsmith/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/alexwauquier/orbsmith/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/alexwauquier/orbsmith/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/alexwauquier/orbsmith/releases/tag/v0.1.0
