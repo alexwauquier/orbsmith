@@ -29,8 +29,6 @@ Orbsmith runs on Windows 10 and 11 and on Linux (x64).
 
 The setup installs Microsoft Edge WebView2 if it is missing. It is preinstalled on Windows 11 and on up-to-date Windows 10.
 
-To update, run the installer of the new version. It detects the installed one and replaces it, keeping your data.
-
 ### Linux
 
 Download the package for your distribution from the [Releases](https://github.com/alexwauquier/orbsmith/releases) page:
@@ -38,8 +36,6 @@ Download the package for your distribution from the [Releases](https://github.co
 - Debian, Ubuntu and derivatives: `Orbsmith_<version>_amd64.deb`, installed with `sudo apt install ./Orbsmith_<version>_amd64.deb`.
 - Fedora, openSUSE and derivatives: `Orbsmith-<version>-1.x86_64.rpm`, installed with `sudo dnf install ./Orbsmith-<version>-1.x86_64.rpm`.
 - Any other distribution: `Orbsmith_<version>_amd64.AppImage`. Make it executable (`chmod +x`), then run it. It may need FUSE 2 (`libfuse2` on Ubuntu).
-
-To update, install the package of the new version the same way.
 
 On GNOME, the tray icon needs the AppIndicator extension, which Ubuntu ships by default. Without it, a window closed while games run cannot be reopened until Orbsmith quits.
 
@@ -63,7 +59,15 @@ Simulated games run in the background: they don't appear in the taskbar. A notif
 
 Closing the window while games are running keeps Orbsmith in the system tray, so they keep running. Click the tray icon to reopen it; its menu also stops every game or quits. With nothing running, closing the window quits Orbsmith. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
 
-The list of games is downloaded once and cached; use the refresh button in the header to update it. Orbsmith only downloads that public list and the game icons: no account, no login.
+The list of games is downloaded once and cached; use the refresh button in the header to update it. Orbsmith only downloads that public list, the game icons and, to look for updates, the latest release from GitHub: no account, no login.
+
+### Updates
+
+At startup, Orbsmith checks GitHub for a new version. When there is one, a banner shows what's new; **Update and restart** stops the running games, pauses the queue with its time left, installs the update and restarts. Nothing is installed unless you choose to. Turn off the check in the settings, or use **Check now** there.
+
+Updates are signed, and Orbsmith refuses any download whose signature does not match. On Linux, updating a `.deb` or `.rpm` install asks for your password.
+
+Versions before 0.6.0 have no updater: install the new version over the old one, as the first time. Your data is kept.
 
 ## Data and uninstalling
 
@@ -113,9 +117,11 @@ cargo test --workspace
 
 On Linux, the Tauri app needs the [system prerequisites](https://tauri.app/start/prerequisites/) to build; `cargo test -p orbsmith-core` works without them.
 
+`pnpm tauri build` also signs the installers for the updater, which needs the private key in `TAURI_SIGNING_PRIVATE_KEY` (and its password in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`). To build without it, skip the updater files: `pnpm tauri build -c '{"bundle":{"createUpdaterArtifacts":false}}'`.
+
 ### Releases
 
-Pushing a `v*` tag builds the Windows installers and the Linux packages and attaches them to a draft GitHub release. The tag must match the version in `package.json`, `Cargo.toml` and `src-tauri/tauri.conf.json`, and be the newest release in `src-tauri/linux/io.github.alexwauquier.orbsmith.metainfo.xml`.
+Pushing a `v*` tag builds the Windows installers and the Linux packages and attaches them to a draft GitHub release. The tag must match the version in `package.json`, `Cargo.toml` and `src-tauri/tauri.conf.json`, and be the newest release in `src-tauri/linux/io.github.alexwauquier.orbsmith.metainfo.xml`. The workflow signs the installers with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets and uploads the `latest.json` manifest that the updater reads. Publish releases as full releases, not pre-releases: the updater only sees the latest full release.
 
 ## License
 

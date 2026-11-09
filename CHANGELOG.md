@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- In-app updates. Orbsmith checks GitHub for a new version at startup, shows what's new, and installs it when you choose to. Updates are signed, and a download whose signature does not match is refused. The check can be turned off in the settings, which also have a **Check now** button.
+
 ## [0.5.0] - 2026-11-09
 
 ### Added
