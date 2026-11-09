@@ -3,6 +3,7 @@ mod notify;
 mod queue;
 mod state;
 mod tray;
+mod update;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -38,6 +39,8 @@ pub fn run() -> tauri::Result<()> {
             tray::show_main_window(app);
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(update::PendingUpdate::default())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -100,6 +103,8 @@ pub fn run() -> tauri::Result<()> {
             commands::clear_queue,
             commands::start_queue,
             commands::pause_queue,
+            update::check_for_update,
+            update::install_update,
         ])
         .build(context)?
         .run(|app, event| {

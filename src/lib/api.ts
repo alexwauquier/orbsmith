@@ -34,6 +34,16 @@ export interface Simulation {
 export interface Settings {
   /** Start every queued game at once instead of one after another. */
   parallelQueue: boolean;
+  /** Look for a new release at startup. */
+  checkForUpdates: boolean;
+}
+
+/** Mirrors `UpdateInfo` in `src-tauri/src/update.rs`. */
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  /** The release notes, as Markdown. */
+  notes: string | null;
 }
 
 /** Mirrors `orbsmith_core::queue::QueueItemInfo`. */
@@ -118,6 +128,19 @@ export function getSettings(): Promise<Settings> {
 
 export function setSettings(settings: Settings): Promise<Settings> {
   return invoke("set_settings", { settings });
+}
+
+/** Looks for a newer release; `null` when Orbsmith is up to date. */
+export function checkForUpdate(): Promise<UpdateInfo | null> {
+  return invoke("check_for_update");
+}
+
+/**
+ * Installs the update found by the last check. Running games stop and the
+ * queue is paused, then Orbsmith restarts, so this only settles on failure.
+ */
+export function installUpdate(): Promise<void> {
+  return invoke("install_update");
 }
 
 export function listQueue(): Promise<QueueState> {

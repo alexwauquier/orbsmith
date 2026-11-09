@@ -17,7 +17,9 @@
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import StartDialog from "$lib/components/StartDialog.svelte";
   import TimerDialog from "$lib/components/TimerDialog.svelte";
+  import UpdateDialog from "$lib/components/UpdateDialog.svelte";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
+  import DownloadIcon from "@lucide/svelte/icons/download";
   import GamepadIcon from "@lucide/svelte/icons/gamepad-2";
   import RefreshIcon from "@lucide/svelte/icons/refresh-cw";
   import SearchIcon from "@lucide/svelte/icons/search";
@@ -28,7 +30,9 @@
     getApps,
     listSimulations,
     addToQueue,
+    checkForUpdate,
     getSettings,
+    installUpdate,
     clearQueue,
     listQueue,
     moveInQueue,
@@ -44,7 +48,8 @@
     type AppSummary,
     type QueueState,
     type Settings,
-    type Simulation
+    type Simulation,
+    type UpdateInfo
   } from "$lib/api";
   import { resolveApps } from "$lib/library";
   import { LibraryStore } from "$lib/library.svelte";
@@ -66,8 +71,13 @@
   let starting = $state<AppSummary | null>(null);
   let editingTimer = $state<Simulation | null>(null);
   let queue = $state.raw<QueueState>({ running: false, paused: false, active: [], queued: [] });
-  let settings = $state.raw<Settings>({ parallelQueue: false });
+  let settings = $state.raw<Settings>({ parallelQueue: false, checkForUpdates: true });
   let settingsOpen = $state(false);
+  /** The newer release found by the last check. */
+  let update = $state.raw<UpdateInfo | null>(null);
+  let updateOpen = $state(false);
+  let checkingUpdate = $state(false);
+  let updateStatus = $state<string | null>(null);
   let sideTab = $state("running");
 
   const results = $derived(searchApps(apps, query, RESULT_LIMIT));
@@ -177,6 +187,25 @@
     });
   }
 
+  /** Checks for updates from the settings, reporting the result there. */
+  async function checkNow() {
+    checkingUpdate = true;
+    updateStatus = null;
+    try {
+      update = await checkForUpdate();
+      if (update) {
+        settingsOpen = false;
+        updateOpen = true;
+      } else {
+        updateStatus = "Orbsmith is up to date.";
+      }
+    } catch (err) {
+      updateStatus = `Could not check for updates: ${message(err)}`;
+    } finally {
+      checkingUpdate = false;
+    }
+  }
+
   onMount(() => {
     void Promise.all([
       loadApps(false),
@@ -186,6 +215,13 @@
         settings = await getSettings();
       })
     ]).finally(() => (loading = false));
+
+    // Quietly: being offline or GitHub being down is not worth a banner.
+    void getSettings()
+      .then(async (saved) => {
+        if (saved.checkForUpdates) update = await checkForUpdate();
+      })
+      .catch((err: unknown) => console.warn("update check failed:", err));
 
     const tick = setInterval(() => (now = Date.now()), 1000);
     const listeners = [
@@ -244,6 +280,23 @@
     </div>
   </header>
   <Separator />
+
+  {#if update && !updateOpen}
+    <Alert.Root class="mx-4 mt-3 w-auto">
+      <DownloadIcon />
+      <Alert.Title>Orbsmith {update.version} is available</Alert.Title>
+      <Alert.Description>
+        <Button variant="link" class="h-auto p-0" onclick={() => (updateOpen = true)}>
+          See what's new and update
+        </Button>
+      </Alert.Description>
+      <Alert.Action>
+        <Button variant="ghost" size="icon-sm" aria-label="Dismiss" onclick={() => (update = null)}>
+          <XIcon />
+        </Button>
+      </Alert.Action>
+    </Alert.Root>
+  {/if}
 
   {#if error}
     <Alert.Root variant="destructive" class="mx-4 mt-3 w-auto">
@@ -437,5 +490,13 @@
   bind:open={settingsOpen}
   {settings}
   onchange={(next) => void changeSettings(next)}
+  checking={checkingUpdate}
+  {updateStatus}
+  oncheck={() => void checkNow()}
+/>
+<UpdateDialog
+  update={updateOpen ? update : null}
+  onclose={() => (updateOpen = false)}
+  oninstall={installUpdate}
 />
 <TimerDialog simulation={editingTimer} onclose={() => (editingTimer = null)} onset={setTimer} />

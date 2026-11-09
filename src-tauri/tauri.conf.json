@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "publisher": "Alex Wauquier",
     "homepage": "https://github.com/alexwauquier/orbsmith",
     "license": "MIT",
@@ -60,6 +61,17 @@
         "files": {
           "/usr/share/metainfo/io.github.alexwauquier.orbsmith.metainfo.xml": "linux/io.github.alexwauquier.orbsmith.metainfo.xml"
         }
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI2NkJDMEZEMkYyMDEwRjkKUldUNUVDQXYvY0JydG5Cb256SFB6RFVMeUZDZ3Vqckw0eUF6YWJ6dnMrV2IyeXA0OEZ4Q2xjcTUK",
+      "endpoints": [
+        "https://github.com/alexwauquier/orbsmith/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }
