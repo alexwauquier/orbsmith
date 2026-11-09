@@ -31,6 +31,12 @@ To update, run the installer of the new version. It detects the installed one an
 2. Click **Start**. Enter the quest duration: the game stops automatically once it has elapsed. Untick **Stop automatically** to keep it running until you stop it.
 3. The **Running** panel lists the active games with their remaining time. You can change the timer or stop a game at any time.
 
+### Quests
+
+To play several quests in a row, choose **Add to quests** instead of **Start now**: the game joins the **Quests** tab with its duration. **Start quests** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps it at the top of the list; stopping a quest's game from the **Running** tab skips to the next one.
+
+To run every quest at the same time instead, turn on **Run quests in parallel** in the settings (gear icon in the header).
+
 Simulated games run in the background: they don't appear in the taskbar. A notification tells you when one stops on its own.
 
 Closing the window while games are running keeps Orbsmith in the system tray, so they keep running. Click the tray icon to reopen it; its menu also stops every game or quits. With nothing running, closing the window quits Orbsmith. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
@@ -39,7 +45,7 @@ The list of games is downloaded once and cached; use the refresh button in the h
 
 ## Data and uninstalling
 
-Orbsmith keeps its data in `%APPDATA%\Orbsmith`: the cached list of games, the stand-in executables, and the WebView data, which includes your favorites and recent games.
+Orbsmith keeps its data in `%APPDATA%\Orbsmith`: the cached list of games, your settings, the stand-in executables, and the WebView data, which includes your favorites and recent games.
 
 - The `setup.exe` uninstaller deletes that folder if you tick **Delete the application data**.
 - The MSI uninstaller leaves it in place, as Windows Installer does for user data. Delete the folder by hand to remove it.

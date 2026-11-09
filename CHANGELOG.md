@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Quests: queue games with their quest duration, then let Orbsmith run them one after another, even while the window is hidden in the tray.
+- Settings window, with an option to run quests in parallel instead.
+- Notifications when every quest is done, or when a quest's game cannot start.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
