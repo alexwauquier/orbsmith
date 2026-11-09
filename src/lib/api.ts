@@ -38,7 +38,7 @@ export interface Settings {
 export interface QueueItem {
   appId: string;
   appName: string;
-  /** How long the game runs, auto-stop margin included. */
+  /** How long the game runs. */
   durationSecs: number;
 }
 
@@ -86,12 +86,6 @@ export function onSimulationsChanged(handler: () => void): Promise<UnlistenFn> {
   return listen("simulations-changed", () => handler());
 }
 
-/**
- * Added to every timer so it counts from once the process is up;
- * Discord detects it almost immediately.
- */
-export const DETECTION_DELAY_SECS = 1;
-
 /** Longest auto-stop timer the backend accepts (`MAX_DURATION`, 7 days). */
 export const MAX_TIMER_MINUTES = 7 * 24 * 60;
 
@@ -113,7 +107,7 @@ export function listQueue(): Promise<QueueState> {
   return invoke("list_queue");
 }
 
-/** `durationSecs` includes the auto-stop margin, like `startSimulation`. */
+/** Queues `appId` to run for `durationSecs`. */
 export function addToQueue(appId: string, durationSecs: number): Promise<QueueState> {
   return invoke("add_to_queue", { appId, durationSecs });
 }

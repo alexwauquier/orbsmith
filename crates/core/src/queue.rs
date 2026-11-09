@@ -15,7 +15,7 @@ use crate::error::Error;
 pub struct QueueItem {
     pub app_id: String,
     pub app_name: String,
-    /// How long the game runs, auto-stop margin included.
+    /// How long the game runs.
     pub duration: Duration,
 }
 

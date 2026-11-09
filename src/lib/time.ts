@@ -22,10 +22,7 @@ export function formatAgo(timestamp: number, now: number): string {
   return relative.format(Math.round(hours / 24), "day");
 }
 
-/**
- * A duration in whole minutes: `15 min`, `1 h 30 min`, `2 h`. The
- * seconds of auto-stop margin are left out.
- */
+/** A duration in whole minutes: `15 min`, `1 h 30 min`, `2 h`. */
 export function formatDuration(durationSecs: number): string {
   const minutes = Math.floor(durationSecs / 60);
   const hours = Math.floor(minutes / 60);

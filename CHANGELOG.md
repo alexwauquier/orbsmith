@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The auto-stop timer runs for exactly the duration entered, without an extra second.
+
 ### Added
 
 - Queue: add games with a duration, then let Orbsmith run them one after another, even while the window is hidden in the tray.

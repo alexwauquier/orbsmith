@@ -37,13 +37,13 @@ describe("formatAgo", () => {
 });
 
 describe("formatDuration", () => {
-  it("shows whole minutes, ignoring the auto-stop margin", () => {
-    expect(formatDuration(15 * 60 + 1)).toBe("15 min");
-    expect(formatDuration(61)).toBe("1 min");
+  it("shows whole minutes", () => {
+    expect(formatDuration(15 * 60)).toBe("15 min");
+    expect(formatDuration(60)).toBe("1 min");
   });
 
   it("adds hours from an hour on", () => {
-    expect(formatDuration(90 * 60 + 1)).toBe("1 h 30 min");
-    expect(formatDuration(2 * 3600 + 1)).toBe("2 h");
+    expect(formatDuration(90 * 60)).toBe("1 h 30 min");
+    expect(formatDuration(2 * 3600)).toBe("2 h");
   });
 });

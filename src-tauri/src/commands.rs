@@ -125,7 +125,7 @@ pub fn list_queue(state: State<'_, AppState>) -> QueueState {
     state.queue().state()
 }
 
-/// Queues `app_id` to run for `duration_secs`, auto-stop margin included.
+/// Queues `app_id` to run for `duration_secs`.
 #[tauri::command]
 pub async fn add_to_queue(
     handle: AppHandle,

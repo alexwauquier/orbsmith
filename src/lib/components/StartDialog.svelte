@@ -7,7 +7,7 @@
   import { Spinner } from "$lib/components/ui/spinner";
   import AppIcon from "$lib/components/AppIcon.svelte";
   import ListPlusIcon from "@lucide/svelte/icons/list-plus";
-  import { DETECTION_DELAY_SECS, MAX_TIMER_MINUTES, type AppSummary } from "$lib/api";
+  import { MAX_TIMER_MINUTES, type AppSummary } from "$lib/api";
 
   let {
     app,
@@ -23,17 +23,15 @@
     onenqueue: (app: AppSummary, durationSecs: number) => Promise<void>;
   } = $props();
 
-  const maxMinutes = Math.floor((MAX_TIMER_MINUTES * 60 - DETECTION_DELAY_SECS) / 60);
-
   let minutes = $state(15);
   let autoStop = $state(true);
   let busy = $state(false);
 
   const valid = $derived(
-    !autoStop || (Number.isInteger(minutes) && minutes >= 1 && minutes <= maxMinutes)
+    !autoStop || (Number.isInteger(minutes) && minutes >= 1 && minutes <= MAX_TIMER_MINUTES)
   );
 
-  const durationSecs = $derived(minutes * 60 + DETECTION_DELAY_SECS);
+  const durationSecs = $derived(minutes * 60);
 
   async function run(action: () => Promise<void>) {
     busy = true;
@@ -90,7 +88,7 @@
               id="duration-minutes"
               type="number"
               min={1}
-              max={maxMinutes}
+              max={MAX_TIMER_MINUTES}
               step={1}
               bind:value={minutes}
               disabled={!autoStop}
