@@ -30,6 +30,7 @@
     addToQueue,
     getSettings,
     listQueue,
+    moveInQueue,
     onQueueChanged,
     onSimulationsChanged,
     removeFromQueue,
@@ -384,6 +385,10 @@
               onpause={() =>
                 void attempt(async () => {
                   queue = await pauseQueue();
+                })}
+              onmove={(appId, up) =>
+                void attempt(async () => {
+                  queue = await moveInQueue(appId, up);
                 })}
               onremove={(appId) =>
                 void attempt(async () => {

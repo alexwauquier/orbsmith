@@ -163,6 +163,20 @@ pub fn remove_from_queue(
     state.queue().state()
 }
 
+/// Moves a waiting game one place up or down.
+#[tauri::command]
+pub fn move_in_queue(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+    app_id: String,
+    up: bool,
+) -> QueueState {
+    if state.queue().move_queued(&app_id, up) {
+        crate::queue_changed(&handle);
+    }
+    state.queue().state()
+}
+
 #[tauri::command]
 pub async fn start_queue(
     handle: AppHandle,

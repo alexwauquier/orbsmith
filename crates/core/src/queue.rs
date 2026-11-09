@@ -117,6 +117,23 @@ impl Queue {
         self.queued.remove(index)
     }
 
+    /// Moves a waiting item one place towards the front (`up`) or the back.
+    /// Returns whether it moved; it can't move past either end.
+    pub fn move_queued(&mut self, app_id: &str, up: bool) -> bool {
+        let Some(index) = self.queued.iter().position(|item| item.app_id == app_id) else {
+            return false;
+        };
+        let Some(target) = (if up {
+            index.checked_sub(1)
+        } else {
+            Some(index + 1).filter(|&next| next < self.queued.len())
+        }) else {
+            return false;
+        };
+        self.queued.swap(index, target);
+        true
+    }
+
     /// The queue saved in `file`. One that was running or paused comes back
     /// paused, so the user decides when it resumes. Active items come back first, with the time they had left if the
     /// queue was paused when saved, or their whole duration after a crash.
@@ -562,6 +579,29 @@ mod tests {
         )
         .unwrap();
         assert_eq!(Queue::load(&file).unwrap().remaining(), 1);
+    }
+
+    #[test]
+    fn moves_waiting_items_up_and_down() {
+        let mut queue = queue(&["a", "b", "c"]);
+        let order = |queue: &Queue| -> Vec<String> {
+            queue.state().queued.into_iter().map(|q| q.app_id).collect()
+        };
+        assert!(queue.move_queued("c", true));
+        assert_eq!(order(&queue), ["a", "c", "b"]);
+        assert!(queue.move_queued("a", false));
+        assert_eq!(order(&queue), ["c", "a", "b"]);
+        assert!(!queue.move_queued("c", true), "already first");
+        assert!(!queue.move_queued("b", false), "already last");
+        assert!(!queue.move_queued("x", true), "unknown");
+    }
+
+    #[test]
+    fn active_items_do_not_move() {
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        queue.next(&running(&[]), false);
+        assert!(!queue.move_queued("a", false));
     }
 
     #[test]

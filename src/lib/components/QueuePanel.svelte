@@ -3,6 +3,8 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import AppIcon from "$lib/components/AppIcon.svelte";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
   import XIcon from "@lucide/svelte/icons/x";
@@ -15,7 +17,8 @@
     appsById,
     onstart,
     onpause,
-    onremove
+    onremove,
+    onmove
   }: {
     queue: QueueState;
     parallel: boolean;
@@ -23,6 +26,8 @@
     onstart: () => void;
     onpause: () => void;
     onremove: (appId: string) => void;
+    /** Moves a waiting game one place towards the front (`up`) or the back. */
+    onmove: (appId: string, up: boolean) => void;
   } = $props();
 
   const empty = $derived(queue.active.length === 0 && queue.queued.length === 0);
@@ -54,7 +59,26 @@
       {#if active}
         <Badge variant="secondary">Running</Badge>
       {:else}
-        <Badge variant="outline" class="tabular-nums">#{position}</Badge>
+        <div class="flex flex-col">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Move {entry.appName} up"
+            disabled={position === 1}
+            onclick={() => onmove(entry.appId, true)}
+          >
+            <ChevronUpIcon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Move {entry.appName} down"
+            disabled={position === queue.queued.length}
+            onclick={() => onmove(entry.appId, false)}
+          >
+            <ChevronDownIcon />
+          </Button>
+        </div>
         <Button
           variant="ghost"
           size="icon-sm"
