@@ -9,14 +9,18 @@
   import AppIcon from "$lib/components/AppIcon.svelte";
   import ListPlusIcon from "@lucide/svelte/icons/list-plus";
   import { MAX_TIMER_MINUTES, type AppSummary } from "$lib/api";
+  import type { LastRun } from "$lib/library";
 
   let {
     app,
+    lastRun,
     onclose,
     onstart,
     onenqueue
   }: {
     app: AppSummary | null;
+    /** How this app was last started, to start it the same way. */
+    lastRun?: LastRun;
     onclose: () => void;
     /** Resolves once the simulation started; the dialog stays open on error. */
     onstart: (
@@ -32,7 +36,9 @@
     ) => Promise<void>;
   } = $props();
 
-  let minutes = $state(15);
+  // The duration and the executable start as the app was last started. Both
+  // depend on `app`, so opening another app discards a value typed for this one.
+  let minutes = $derived(app ? (lastRun?.minutes ?? 15) : 15);
   let autoStop = $state(true);
   let busy = $state(false);
 
@@ -42,8 +48,11 @@
 
   const durationSecs = $derived(minutes * 60);
 
-  // Resets to the default whenever another app is opened.
-  let executable = $derived(app?.executable ?? "");
+  let executable = $derived(
+    app && lastRun?.executable && app.executables.includes(lastRun.executable)
+      ? lastRun.executable
+      : (app?.executable ?? "")
+  );
   /** Only a non-default choice is sent, so the default can follow the catalog. */
   const chosenExecutable = $derived(app && executable !== app.executable ? executable : undefined);
 

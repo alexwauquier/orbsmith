@@ -130,7 +130,10 @@
     });
     if (ok) {
       starting = null;
-      library.markUsed(app.id);
+      library.markStarted(app.id, {
+        minutes: durationSecs === undefined ? undefined : durationSecs / 60,
+        executable
+      });
       // Reload rather than append: the change event may already have.
       await reloadSimulations();
     }
@@ -161,7 +164,7 @@
     });
     if (ok) {
       starting = null;
-      library.markUsed(app.id);
+      library.markStarted(app.id, { minutes: durationSecs / 60, executable });
       sideTab = "queue";
     }
   }
@@ -406,7 +409,13 @@
   </div>
 </div>
 
-<StartDialog app={starting} onclose={() => (starting = null)} onstart={start} onenqueue={enqueue} />
+<StartDialog
+  app={starting}
+  lastRun={starting ? library.lastRun(starting.id) : undefined}
+  onclose={() => (starting = null)}
+  onstart={start}
+  onenqueue={enqueue}
+/>
 <SettingsDialog
   bind:open={settingsOpen}
   {settings}
