@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Choose which executable to simulate when a game has several, for another store, region or version.
 - The start dialog remembers the duration and executable last used for each game.
 - Games waiting in the queue show an "In queue" badge in the lists.
+- Buttons to clear the queue and the recent games.
 
 ## [0.3.0] - 2026-11-09
 
