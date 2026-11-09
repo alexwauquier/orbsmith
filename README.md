@@ -28,12 +28,12 @@ To update, run the installer of the new version. It detects the installed one an
 ## Usage
 
 1. Search for a game by name. Star the ones you use often: favorites and recently started games show up before you search.
-2. Click **Start**, enter how long the game should run (for example, a quest duration), then **Start now**: the game stops automatically once that time has elapsed. Untick **Stop automatically** to keep it running until you stop it.
+2. Click **Start**, enter how long the game should run (for example, a quest duration), then **Start now**: the game stops automatically once that time has elapsed. Untick **Stop automatically** to keep it running until you stop it. If a game lists several executables and isn't detected, pick another one in **Executable**. Orbsmith remembers the duration and executable you last used for each game.
 3. The **Running** panel lists the active games with their remaining time. You can change the timer or stop a game at any time.
 
 ### Queue
 
-To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps its remaining time: **Resume** restarts it for just that long, then carries on with the queue. **Stop all** in the tray menu pauses the queue the same way. Stopping a queued game from the **Running** tab skips to the next one.
+To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. Reorder it with the arrows. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps its remaining time: **Resume** restarts it for just that long, then carries on with the queue. **Stop all** in the tray menu pauses the queue the same way. Stopping a queued game from the **Running** tab skips to the next one. The queue is saved: after closing Orbsmith, it comes back paused, ready to resume.
 
 To run every game in the queue at the same time instead, turn on **Run the queue in parallel** in the settings (gear icon in the header).
 
@@ -45,7 +45,7 @@ The list of games is downloaded once and cached; use the refresh button in the h
 
 ## Data and uninstalling
 
-Orbsmith keeps its data in `%APPDATA%\Orbsmith`: the cached list of games, your settings, the stand-in executables, and the WebView data, which includes your favorites and recent games.
+Orbsmith keeps its data in `%APPDATA%\Orbsmith`: the cached list of games, your settings, the queue, the stand-in executables, and the WebView data, which includes your favorites, recent games and how you last started each one.
 
 - The `setup.exe` uninstaller deletes that folder if you tick **Delete the application data**.
 - The MSI uninstaller leaves it in place, as Windows Installer does for user data. Delete the folder by hand to remove it.
