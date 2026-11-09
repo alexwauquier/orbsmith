@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - In-app updates. Orbsmith checks GitHub for a new version at startup, shows what's new, and installs it when you choose to. Updates are signed, and a download whose signature does not match is refused. The check can be turned off in the settings, which also have a **Check now** button.
+- Release files come with a build provenance attestation, to check with `gh attestation verify` that they were built from this repository.
+- A log file, `logs/orbsmith.log` in the data folder, to attach to bug reports.
+
+### Changed
+
+- The game list is downloaded again once it is a day old, so new games show up without a manual refresh.
+- Search ignores punctuation, accents and trademark signs: "plants vs zombies" finds "Plants vs. Zombies™: Replanted".
+- Searching for a game that is not in the list explains that games detected through their store cannot be simulated.
+
+### Fixed
+
+- Starting a game whose executable another running game already uses failed with an unclear error. The message now names that game.
 
 ## [0.5.0] - 2026-11-09
 
