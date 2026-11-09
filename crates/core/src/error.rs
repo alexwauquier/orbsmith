@@ -16,6 +16,14 @@ pub enum Error {
     UnknownExecutable { app: String, executable: String },
     #[error("{0} is already running")]
     AlreadyRunning(String),
+    #[error(
+        "{app} cannot start as {executable}: {other} is running as that executable. Stop it first, or pick another executable."
+    )]
+    ExecutableInUse {
+        app: String,
+        executable: String,
+        other: String,
+    },
     #[error("no simulation is running for {0}")]
     NotRunning(String),
     #[error("dummy executable not found at {0}")]

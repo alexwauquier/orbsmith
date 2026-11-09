@@ -53,6 +53,8 @@ pub struct Ended {
 
 struct Running {
     info: SimulationInfo,
+    /// Where the dummy runs from, under the executables dir.
+    exe: PathBuf,
     stop_at: Option<SystemTime>,
     child: Child,
 }
@@ -149,6 +151,22 @@ impl Simulations {
 
         let exe_dir = target.exe.dir_under(&self.executables_dir);
         let exe = exe_dir.join(target.exe.file_name());
+        // Some apps list the same executable. It cannot be replaced while it
+        // runs, and the detector would only see one of the two apps anyway.
+        let same_exe = |other: &Path| {
+            if os.case_insensitive_paths() {
+                other.to_string_lossy().to_lowercase() == exe.to_string_lossy().to_lowercase()
+            } else {
+                other == exe
+            }
+        };
+        if let Some(other) = self.running.values().find(|running| same_exe(&running.exe)) {
+            return Err(Error::ExecutableInUse {
+                app: app.name.clone(),
+                executable: target.exe.to_string(),
+                other: other.info.app_name.clone(),
+            });
+        }
         prepare_exe_dir(&self.executables_dir, &exe_dir, &exe)?;
         fs::copy(&self.dummy, &exe)?;
 
@@ -185,6 +203,7 @@ impl Simulations {
             app.id.clone(),
             Running {
                 info: info.clone(),
+                exe,
                 stop_at,
                 child,
             },
@@ -386,6 +405,32 @@ mod tests {
             sims.start(&app, Os::CURRENT, None, None),
             Err(Error::MissingDummy(_))
         ));
+    }
+
+    #[test]
+    fn refuses_an_executable_another_app_runs_as() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut sims = Simulations::new(test_binary(), dir.path().join("executables"));
+        let json = format!(
+            r#"[
+                {{"id": "1", "name": "First", "executables": [
+                    {{"os": "{os}", "name": "{EXE}", "is_launcher": false, "arguments": "{HELPER_ARGS}"}}]}},
+                {{"id": "2", "name": "Second", "executables": [
+                    {{"os": "{os}", "name": "{EXE}", "is_launcher": false, "arguments": "{HELPER_ARGS}"}}]}}
+            ]"#,
+            os = Os::CURRENT.api_name()
+        );
+        let catalog = Catalog::from_json(json.as_bytes(), UNIX_EPOCH).unwrap();
+        let (first, second) = (catalog.get("1").unwrap(), catalog.get("2").unwrap());
+
+        sims.start(first, Os::CURRENT, None, None).unwrap();
+        assert!(matches!(
+            sims.start(second, Os::CURRENT, None, None),
+            Err(Error::ExecutableInUse { ref other, .. }) if other == "First"
+        ));
+        sims.stop("1").unwrap();
+        sims.start(second, Os::CURRENT, None, None).unwrap();
+        sims.stop("2").unwrap();
     }
 
     #[test]
