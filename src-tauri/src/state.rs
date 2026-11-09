@@ -14,13 +14,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(layout: Layout, dummy: PathBuf, settings: Settings) -> Self {
+    pub fn new(layout: Layout, dummy: PathBuf, settings: Settings, queue: Queue) -> Self {
         let simulations = Simulations::new(dummy, layout.executables_dir());
         Self {
             layout,
             catalog: tokio::sync::Mutex::new(None),
             simulations: Mutex::new(simulations),
-            queue: Mutex::new(Queue::new()),
+            queue: Mutex::new(queue),
             settings: Mutex::new(settings),
         }
     }

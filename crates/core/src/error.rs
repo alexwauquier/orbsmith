@@ -20,6 +20,8 @@ pub enum Error {
     MissingDummy(String),
     #[error("invalid settings file: {0}")]
     InvalidSettings(#[source] serde_json::Error),
+    #[error("invalid queue file: {0}")]
+    InvalidQueueFile(#[source] serde_json::Error),
     #[error("{0} is already in the queue")]
     AlreadyQueued(String),
     #[error("the auto-stop timer cannot exceed 7 days")]

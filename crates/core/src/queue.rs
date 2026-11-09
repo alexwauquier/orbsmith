@@ -5,9 +5,12 @@
 //! starts what [`Queue::next`] returns and reports failures back.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fs;
+use std::io::ErrorKind;
+use std::path::Path;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
@@ -112,6 +115,46 @@ impl Queue {
     pub fn remove(&mut self, app_id: &str) -> Option<QueueItem> {
         let index = self.queued.iter().position(|item| item.app_id == app_id)?;
         self.queued.remove(index)
+    }
+
+    /// The queue saved in `file`. One that was running or paused comes back
+    /// paused, so the user decides when it resumes. Active items come back first, with the time they had left if the
+    /// queue was paused when saved, or their whole duration after a crash.
+    pub fn load(file: &Path) -> Result<Self, Error> {
+        let saved: SavedQueue = match fs::read(file) {
+            Ok(bytes) => serde_json::from_slice(&bytes).map_err(Error::InvalidQueueFile)?,
+            Err(err) if err.kind() == ErrorKind::NotFound => return Ok(Self::new()),
+            Err(err) => return Err(err.into()),
+        };
+        let mut queue = Self::new();
+        for item in saved.items {
+            // Skip duplicates rather than failing on a hand-edited file.
+            let _ = queue.add(item.into());
+        }
+        queue.paused = saved.paused && !queue.queued.is_empty();
+        Ok(queue)
+    }
+
+    /// Writes every unfinished item, active ones first, through a temporary
+    /// file.
+    pub fn save(&self, file: &Path) -> Result<(), Error> {
+        let saved = SavedQueue {
+            paused: self.running || self.paused,
+            items: self
+                .active
+                .iter()
+                .chain(&self.queued)
+                .map(SavedItem::from)
+                .collect(),
+        };
+        if let Some(dir) = file.parent() {
+            fs::create_dir_all(dir)?;
+        }
+        let json = serde_json::to_vec_pretty(&saved).map_err(Error::InvalidQueueFile)?;
+        let tmp = file.with_extension("json.tmp");
+        fs::write(&tmp, json)?;
+        fs::rename(&tmp, file)?;
+        Ok(())
     }
 
     /// Starts the queue, or resumes it after a pause.
@@ -223,6 +266,51 @@ impl Queue {
             .iter()
             .chain(&self.active)
             .any(|item| item.app_id == app_id)
+    }
+}
+
+/// On-disk form of the queue, in `queue.json`.
+#[derive(Debug, Serialize, Deserialize)]
+struct SavedQueue {
+    /// Whether it was running or paused, rather than never started.
+    #[serde(default)]
+    paused: bool,
+    items: Vec<SavedItem>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedItem {
+    app_id: String,
+    app_name: String,
+    duration_secs: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    left_ms: Option<u64>,
+}
+
+impl From<&QueueItem> for SavedItem {
+    fn from(item: &QueueItem) -> Self {
+        Self {
+            app_id: item.app_id.clone(),
+            app_name: item.app_name.clone(),
+            duration_secs: item.duration.as_secs(),
+            left_ms: item
+                .left
+                .map(|left| u64::try_from(left.as_millis()).unwrap_or(u64::MAX)),
+        }
+    }
+}
+
+impl From<SavedItem> for QueueItem {
+    fn from(saved: SavedItem) -> Self {
+        Self {
+            left: saved.left_ms.map(Duration::from_millis),
+            ..Self::new(
+                saved.app_id,
+                saved.app_name,
+                Duration::from_secs(saved.duration_secs),
+            )
+        }
     }
 }
 
@@ -395,6 +483,85 @@ mod tests {
         assert!(queue.pause(&left(&[])).is_empty());
         assert!(!queue.is_paused());
         assert_eq!(queue.remaining(), 1);
+    }
+
+    #[test]
+    fn saves_and_restores_paused_with_the_time_left() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("queue.json");
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        queue.next(&running(&[]), false);
+        queue.pause(&left(&[("a", 42)]));
+        queue.save(&file).unwrap();
+        assert!(!file.with_extension("json.tmp").exists());
+
+        let mut restored = Queue::load(&file).unwrap();
+        assert!(restored.is_paused() && !restored.is_running());
+        assert_eq!(restored.state().queued, queue.state().queued);
+        restored.start();
+        let step = restored.next(&running(&[]), false);
+        assert_eq!(step.start[0].run_time(), Duration::from_secs(42));
+    }
+
+    #[test]
+    fn restores_active_items_first_after_a_crash() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("queue.json");
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        queue.next(&running(&[]), false);
+        // Saved while "a" was running, then Orbsmith died.
+        queue.save(&file).unwrap();
+
+        let restored = Queue::load(&file).unwrap();
+        assert!(restored.is_paused(), "it was running");
+        let state = restored.state();
+        let order: Vec<_> = state.queued.iter().map(|q| q.app_id.as_str()).collect();
+        assert_eq!(order, ["a", "b"]);
+        assert_eq!(
+            state.queued[0].left_secs, None,
+            "a restarts from the beginning"
+        );
+    }
+
+    #[test]
+    fn a_queue_never_started_is_not_restored_as_paused() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("queue.json");
+        queue(&["a"]).save(&file).unwrap();
+        let restored = Queue::load(&file).unwrap();
+        assert!(!restored.is_paused());
+        assert_eq!(restored.remaining(), 1);
+    }
+
+    #[test]
+    fn loads_an_empty_queue_without_a_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let queue = Queue::load(&dir.path().join("queue.json")).unwrap();
+        assert_eq!(queue.remaining(), 0);
+        assert!(!queue.is_paused());
+    }
+
+    #[test]
+    fn reports_a_corrupt_file_and_skips_duplicates() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("queue.json");
+        fs::write(&file, "not json").unwrap();
+        assert!(matches!(
+            Queue::load(&file),
+            Err(Error::InvalidQueueFile(_))
+        ));
+
+        fs::write(
+            &file,
+            r#"{ "items": [
+                { "appId": "a", "appName": "A", "durationSecs": 60 },
+                { "appId": "a", "appName": "A", "durationSecs": 60 }
+            ] }"#,
+        )
+        .unwrap();
+        assert_eq!(Queue::load(&file).unwrap().remaining(), 1);
     }
 
     #[test]

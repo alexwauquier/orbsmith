@@ -22,6 +22,11 @@ impl Layout {
         self.data_dir.join("detectable-apps.json")
     }
 
+    /// The queue, kept across restarts.
+    pub fn queue_file(&self) -> PathBuf {
+        self.data_dir.join("queue.json")
+    }
+
     /// User preferences.
     pub fn settings_file(&self) -> PathBuf {
         self.data_dir.join("settings.json")

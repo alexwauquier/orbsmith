@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
-use orbsmith_core::{Layout, Os, Settings, cleanup};
+use orbsmith_core::{Layout, Os, Queue, Settings, cleanup};
 use tauri::utils::config::{AppDirectoriesOverride, AppDirectoryOverrides};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 
@@ -51,7 +51,11 @@ pub fn run() -> tauri::Result<()> {
                 log::warn!("using default settings: {err}");
                 Settings::default()
             });
-            app.manage(AppState::new(layout, dummy_path()?, settings));
+            let queue = Queue::load(&layout.queue_file()).unwrap_or_else(|err| {
+                log::warn!("starting with an empty queue: {err}");
+                Queue::new()
+            });
+            app.manage(AppState::new(layout, dummy_path()?, settings, queue));
             tray::create(app.handle())?;
             tauri::async_runtime::spawn(watch_simulations(app.handle().clone()));
             Ok(())
@@ -92,6 +96,8 @@ pub fn run() -> tauri::Result<()> {
         .build(context)?
         .run(|app, event| {
             if let RunEvent::Exit = event {
+                // Saves the queue with the time its games had left.
+                queue::pause(app);
                 app.state::<AppState>().simulations().stop_all();
             }
         });
@@ -129,8 +135,12 @@ pub(crate) fn simulations_changed(app: &AppHandle) {
     }
 }
 
-/// Updates the tray and tells the frontend to reload the queue.
+/// Saves the queue, updates the tray and tells the frontend to reload it.
 pub(crate) fn queue_changed(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if let Err(err) = state.queue().save(&state.layout.queue_file()) {
+        log::warn!("failed to save the queue: {err}");
+    }
     tray::refresh(app);
     if let Err(err) = app.emit(QUEUE_CHANGED_EVENT, ()) {
         log::warn!("failed to emit {QUEUE_CHANGED_EVENT}: {err}");
