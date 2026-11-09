@@ -42,6 +42,30 @@ jobs:
           done
           exit "$status"
 
+      # The release notes are the version's CHANGELOG.md section, without its
+      # heading: only the types of changes and their entries.
+      - name: Extract the release notes from the changelog
+        id: notes
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes="$(awk -v heading="## [$version]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found && /^\[[^]]+\]: / { next } # link references at the end of the file
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d' | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}')"
+          if [ -z "$notes" ]; then
+            echo "::error::CHANGELOG.md has no entries for $version"
+            exit 1
+          fi
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$notes"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 12.16.1
@@ -68,7 +92,7 @@ jobs:
         with:
           # Empty outside tag builds, so no release is created.
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-          releaseName: Orbsmith ${{ github.ref_name }}
+          releaseName: Orbsmith __VERSION__
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
-          generateReleaseNotes: true
           uploadWorkflowArtifacts: true
