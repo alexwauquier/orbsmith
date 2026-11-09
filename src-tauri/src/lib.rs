@@ -1,18 +1,19 @@
 mod commands;
 mod state;
+mod tray;
 
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use orbsmith_core::{Layout, Os, cleanup};
 use tauri::utils::config::{AppDirectoriesOverride, AppDirectoryOverrides};
-use tauri::{AppHandle, Emitter, Manager, RunEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 
 use crate::state::AppState;
 
-/// Emitted with an [`orbsmith_core::Ended`] payload when a simulation stops on
-/// its own (timer or dummy exit).
-const SIMULATION_ENDED_EVENT: &str = "simulation-ended";
+/// Emitted, without payload, whenever simulations start or stop, including
+/// from the tray or on their own. Listeners reload the list.
+const SIMULATIONS_CHANGED_EVENT: &str = "simulations-changed";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> tauri::Result<()> {
@@ -36,8 +37,25 @@ pub fn run() -> tauri::Result<()> {
             }
 
             app.manage(AppState::new(layout, dummy_path()?));
+            tray::create(app.handle())?;
             tauri::async_runtime::spawn(watch_simulations(app.handle().clone()));
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Closing the window while games run keeps them running in the tray;
+            // with nothing running, the app quits as usual.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let app = window.app_handle();
+                let running = app
+                    .try_state::<AppState>()
+                    .map_or(0, |state| state.simulations().list().len());
+                if running > 0 {
+                    api.prevent_close();
+                    if let Err(err) = window.hide() {
+                        log::warn!("failed to hide the window: {err}");
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_apps,
@@ -77,6 +95,15 @@ fn dummy_path() -> std::io::Result<std::path::PathBuf> {
         .with_file_name(format!("orbsmith-dummy{}", std::env::consts::EXE_SUFFIX)))
 }
 
+/// Updates the tray and tells the frontend to reload the simulations. Must be
+/// called without holding the simulations lock.
+pub(crate) fn simulations_changed(app: &AppHandle) {
+    tray::refresh(app);
+    if let Err(err) = app.emit(SIMULATIONS_CHANGED_EVENT, ()) {
+        log::warn!("failed to emit {SIMULATIONS_CHANGED_EVENT}: {err}");
+    }
+}
+
 /// Applies auto-stop timers and notices dummies that exited, once per second.
 async fn watch_simulations(app: AppHandle) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
@@ -86,10 +113,9 @@ async fn watch_simulations(app: AppHandle) {
             .state::<AppState>()
             .simulations()
             .tick(SystemTime::now());
-        for end in ended {
-            if let Err(err) = app.emit(SIMULATION_ENDED_EVENT, &end) {
-                log::warn!("failed to emit {SIMULATION_ENDED_EVENT}: {err}");
-            }
+        if ended.is_empty() {
+            continue;
         }
+        simulations_changed(&app);
     }
 }

@@ -28,12 +28,6 @@ export interface Simulation {
   stopAt: number | null;
 }
 
-export interface SimulationEnded {
-  appId: string;
-  /** `timer`: the auto-stop timer expired. `exited`: the dummy quit by itself. */
-  reason: "timer" | "exited";
-}
-
 /** Uses the cached list unless `refresh` is set or there is no cache yet. */
 export function getApps(refresh = false): Promise<AppList> {
   return invoke("get_apps", { refresh });
@@ -60,8 +54,12 @@ export function setSimulationTimer(
   return invoke("set_simulation_timer", { appId, durationSecs });
 }
 
-export function onSimulationEnded(handler: (ended: SimulationEnded) => void): Promise<UnlistenFn> {
-  return listen<SimulationEnded>("simulation-ended", (event) => handler(event.payload));
+/**
+ * Fires whenever simulations start or stop, including from the tray and when
+ * they end on their own. Mirrors `SIMULATIONS_CHANGED_EVENT` in `src-tauri/src/lib.rs`.
+ */
+export function onSimulationsChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen("simulations-changed", () => handler());
 }
 
 /**

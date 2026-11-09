@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use orbsmith_core::{AppSummary, Catalog, Os, SimulationInfo};
 use serde::{Serialize, Serializer};
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::state::AppState;
 
@@ -53,6 +53,7 @@ pub fn list_simulations(state: State<'_, AppState>) -> Vec<SimulationInfo> {
 /// after that long.
 #[tauri::command]
 pub async fn start_simulation(
+    handle: AppHandle,
     state: State<'_, AppState>,
     app_id: String,
     duration_secs: Option<u64>,
@@ -65,12 +66,18 @@ pub async fn start_simulation(
         state
             .simulations()
             .start(app, Os::CURRENT, duration_secs.map(Duration::from_secs))?;
+    crate::simulations_changed(&handle);
     Ok(info)
 }
 
 #[tauri::command]
-pub fn stop_simulation(state: State<'_, AppState>, app_id: String) -> CommandResult<()> {
+pub fn stop_simulation(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+    app_id: String,
+) -> CommandResult<()> {
     state.simulations().stop(&app_id)?;
+    crate::simulations_changed(&handle);
     Ok(())
 }
 

@@ -24,7 +24,7 @@
   import {
     getApps,
     listSimulations,
-    onSimulationEnded,
+    onSimulationsChanged,
     setSimulationTimer,
     startSimulation,
     stopSimulation,
@@ -91,10 +91,13 @@
 
   async function start(app: AppSummary, durationSecs: number | undefined) {
     const ok = await attempt(async () => {
-      const sim = await startSimulation(app.id, durationSecs);
-      simulations = [...simulations, sim];
+      await startSimulation(app.id, durationSecs);
     });
-    if (ok) starting = null;
+    if (ok) {
+      starting = null;
+      // Reload rather than append: the change event may already have.
+      await reloadSimulations();
+    }
   }
 
   async function stop(appId: string) {
@@ -114,7 +117,7 @@
     void Promise.all([loadApps(false), reloadSimulations()]).finally(() => (loading = false));
 
     const tick = setInterval(() => (now = Date.now()), 1000);
-    const unlisten = onSimulationEnded(() => void reloadSimulations());
+    const unlisten = onSimulationsChanged(() => void reloadSimulations());
     return () => {
       clearInterval(tick);
       void unlisten.then((stopListening) => stopListening());
