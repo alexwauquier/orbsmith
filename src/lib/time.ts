@@ -21,3 +21,15 @@ export function formatAgo(timestamp: number, now: number): string {
   if (Math.abs(hours) < 24) return relative.format(hours, "hour");
   return relative.format(Math.round(hours / 24), "day");
 }
+
+/**
+ * A quest's duration in whole minutes: `15 min`, `1 h 30 min`, `2 h`. The
+ * seconds of auto-stop margin are left out.
+ */
+export function formatQuestDuration(durationSecs: number): string {
+  const minutes = Math.floor(durationSecs / 60);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${minutes} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}

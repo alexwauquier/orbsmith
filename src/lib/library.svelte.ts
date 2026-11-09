@@ -25,7 +25,7 @@ export class LibraryStore {
     this.save();
   }
 
-  markStarted(id: string) {
+  markUsed(id: string) {
     this.recent = addRecent(this.recent, id);
     this.save();
   }

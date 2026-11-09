@@ -6,39 +6,56 @@
   import { Input } from "$lib/components/ui/input";
   import { Spinner } from "$lib/components/ui/spinner";
   import AppIcon from "$lib/components/AppIcon.svelte";
+  import ListPlusIcon from "@lucide/svelte/icons/list-plus";
   import { DETECTION_DELAY_SECS, MAX_TIMER_MINUTES, type AppSummary } from "$lib/api";
 
   let {
     app,
     onclose,
-    onstart
+    onstart,
+    onaddquest
   }: {
     app: AppSummary | null;
     onclose: () => void;
     /** Resolves once the simulation started; the dialog stays open on error. */
     onstart: (app: AppSummary, durationSecs: number | undefined) => Promise<void>;
+    /** Resolves once the quest is queued; the dialog stays open on error. */
+    onaddquest: (app: AppSummary, durationSecs: number) => Promise<void>;
   } = $props();
 
   const maxQuestMinutes = Math.floor((MAX_TIMER_MINUTES * 60 - DETECTION_DELAY_SECS) / 60);
 
   let questMinutes = $state(15);
   let autoStop = $state(true);
-  let starting = $state(false);
+  let busy = $state(false);
 
   const valid = $derived(
     !autoStop ||
       (Number.isInteger(questMinutes) && questMinutes >= 1 && questMinutes <= maxQuestMinutes)
   );
 
-  async function submit(event: SubmitEvent) {
-    event.preventDefault();
-    if (!app || !valid) return;
-    starting = true;
+  const durationSecs = $derived(questMinutes * 60 + DETECTION_DELAY_SECS);
+
+  async function run(action: () => Promise<void>) {
+    busy = true;
     try {
-      await onstart(app, autoStop ? questMinutes * 60 + DETECTION_DELAY_SECS : undefined);
+      await action();
     } finally {
-      starting = false;
+      busy = false;
     }
+  }
+
+  function submit(event: SubmitEvent) {
+    event.preventDefault();
+    const target = app;
+    if (!target || !valid) return;
+    void run(() => onstart(target, autoStop ? durationSecs : undefined));
+  }
+
+  function addQuest() {
+    const target = app;
+    if (!target || !valid || !autoStop) return;
+    void run(() => onaddquest(target, durationSecs));
   }
 </script>
 
@@ -92,11 +109,21 @@
 
         <Dialog.Footer>
           <Button type="button" variant="outline" onclick={onclose}>Cancel</Button>
-          <Button type="submit" disabled={!valid || starting}>
-            {#if starting}
+          <!-- A quest needs a duration, so it requires the auto-stop timer. -->
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!valid || !autoStop || busy}
+            onclick={addQuest}
+          >
+            <ListPlusIcon data-icon="inline-start" />
+            Add to quests
+          </Button>
+          <Button type="submit" disabled={!valid || busy}>
+            {#if busy}
               <Spinner data-icon="inline-start" />
             {/if}
-            Start
+            Start now
           </Button>
         </Dialog.Footer>
       </form>

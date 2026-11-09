@@ -4,6 +4,7 @@
   import * as Empty from "$lib/components/ui/empty";
   import * as InputGroup from "$lib/components/ui/input-group";
   import * as Item from "$lib/components/ui/item";
+  import * as Tabs from "$lib/components/ui/tabs";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
@@ -11,7 +12,9 @@
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Spinner } from "$lib/components/ui/spinner";
   import AppRow from "$lib/components/AppRow.svelte";
+  import QuestsPanel from "$lib/components/QuestsPanel.svelte";
   import RunningCard from "$lib/components/RunningCard.svelte";
+  import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import StartDialog from "$lib/components/StartDialog.svelte";
   import TimerDialog from "$lib/components/TimerDialog.svelte";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
@@ -19,15 +22,26 @@
   import RefreshIcon from "@lucide/svelte/icons/refresh-cw";
   import SearchIcon from "@lucide/svelte/icons/search";
   import SearchXIcon from "@lucide/svelte/icons/search-x";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
   import XIcon from "@lucide/svelte/icons/x";
   import {
     getApps,
     listSimulations,
+    addQuest,
+    getSettings,
+    listQuests,
+    onQuestsChanged,
     onSimulationsChanged,
+    removeQuest,
+    setSettings,
+    startQuests,
+    stopQuests,
     setSimulationTimer,
     startSimulation,
     stopSimulation,
     type AppSummary,
+    type QuestsState,
+    type Settings,
     type Simulation
   } from "$lib/api";
   import { resolveApps } from "$lib/library";
@@ -49,10 +63,16 @@
   let now = $state(Date.now());
   let starting = $state<AppSummary | null>(null);
   let editingTimer = $state<Simulation | null>(null);
+  let quests = $state.raw<QuestsState>({ running: false, active: [], queued: [] });
+  let settings = $state.raw<Settings>({ questsInParallel: false });
+  let settingsOpen = $state(false);
+  let sideTab = $state("running");
 
   const results = $derived(searchApps(apps, query, RESULT_LIMIT));
   const appsById = $derived(new Map(apps.map((app) => [app.id, app])));
   const runningIds = $derived(new Set(simulations.map((sim) => sim.appId)));
+
+  const questCount = $derived(quests.active.length + quests.queued.length);
 
   const library = new LibraryStore();
   const favoriteApps = $derived(resolveApps(library.favorites, appsById));
@@ -105,7 +125,7 @@
     });
     if (ok) {
       starting = null;
-      library.markStarted(app.id);
+      library.markUsed(app.id);
       // Reload rather than append: the change event may already have.
       await reloadSimulations();
     }
@@ -124,14 +144,47 @@
     if (ok) editingTimer = null;
   }
 
+  async function reloadQuests() {
+    await attempt(async () => {
+      quests = await listQuests();
+    });
+  }
+
+  async function queueQuest(app: AppSummary, durationSecs: number) {
+    const ok = await attempt(async () => {
+      quests = await addQuest(app.id, durationSecs);
+    });
+    if (ok) {
+      starting = null;
+      library.markUsed(app.id);
+      sideTab = "quests";
+    }
+  }
+
+  async function changeSettings(next: Settings) {
+    await attempt(async () => {
+      settings = await setSettings(next);
+    });
+  }
+
   onMount(() => {
-    void Promise.all([loadApps(false), reloadSimulations()]).finally(() => (loading = false));
+    void Promise.all([
+      loadApps(false),
+      reloadSimulations(),
+      reloadQuests(),
+      attempt(async () => {
+        settings = await getSettings();
+      })
+    ]).finally(() => (loading = false));
 
     const tick = setInterval(() => (now = Date.now()), 1000);
-    const unlisten = onSimulationsChanged(() => void reloadSimulations());
+    const listeners = [
+      onSimulationsChanged(() => void reloadSimulations()),
+      onQuestsChanged(() => void reloadQuests())
+    ];
     return () => {
       clearInterval(tick);
-      void unlisten.then((stopListening) => stopListening());
+      for (const listener of listeners) void listener.then((stopListening) => stopListening());
     };
   });
 </script>
@@ -168,6 +221,14 @@
         {:else}
           <RefreshIcon />
         {/if}
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Settings"
+        onclick={() => (settingsOpen = true)}
+      >
+        <SettingsIcon />
       </Button>
     </div>
   </header>
@@ -275,33 +336,76 @@
 
     <Separator orientation="vertical" />
 
-    <aside class="flex w-80 shrink-0 flex-col gap-3 p-4">
-      <div class="flex items-center gap-2">
-        <h2 class="text-sm font-medium">Running</h2>
-        {#if simulations.length > 0}
-          <Badge variant="secondary">{simulations.length}</Badge>
-        {/if}
-      </div>
-      <ScrollArea class="min-h-0 flex-1">
-        {#if simulations.length === 0}
-          <p class="text-sm text-muted-foreground">Nothing is running.</p>
-        {:else}
-          <div class="flex flex-col gap-2">
-            {#each simulations as sim (sim.appId)}
-              <RunningCard
-                simulation={sim}
-                iconHash={appsById.get(sim.appId)?.iconHash ?? null}
-                {now}
-                onstop={() => stop(sim.appId)}
-                onedittimer={() => (editingTimer = sim)}
-              />
-            {/each}
-          </div>
-        {/if}
-      </ScrollArea>
+    <aside class="flex w-80 shrink-0 flex-col p-4">
+      <Tabs.Root bind:value={sideTab} class="min-h-0 flex-1">
+        <Tabs.List class="w-full">
+          <Tabs.Trigger value="running">
+            Running
+            {#if simulations.length > 0}
+              <Badge variant="secondary">{simulations.length}</Badge>
+            {/if}
+          </Tabs.Trigger>
+          <Tabs.Trigger value="quests">
+            Quests
+            {#if questCount > 0}
+              <Badge variant="secondary">{questCount}</Badge>
+            {/if}
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content value="running" class="min-h-0">
+          <ScrollArea class="h-full">
+            {#if simulations.length === 0}
+              <p class="text-sm text-muted-foreground">Nothing is running.</p>
+            {:else}
+              <div class="flex flex-col gap-2">
+                {#each simulations as sim (sim.appId)}
+                  <RunningCard
+                    simulation={sim}
+                    iconHash={appsById.get(sim.appId)?.iconHash ?? null}
+                    {now}
+                    onstop={() => stop(sim.appId)}
+                    onedittimer={() => (editingTimer = sim)}
+                  />
+                {/each}
+              </div>
+            {/if}
+          </ScrollArea>
+        </Tabs.Content>
+        <Tabs.Content value="quests" class="min-h-0">
+          <ScrollArea class="h-full">
+            <QuestsPanel
+              {quests}
+              parallel={settings.questsInParallel}
+              {appsById}
+              onstart={() =>
+                void attempt(async () => {
+                  quests = await startQuests();
+                })}
+              onstop={() =>
+                void attempt(async () => {
+                  quests = await stopQuests();
+                })}
+              onremove={(appId) =>
+                void attempt(async () => {
+                  quests = await removeQuest(appId);
+                })}
+            />
+          </ScrollArea>
+        </Tabs.Content>
+      </Tabs.Root>
     </aside>
   </div>
 </div>
 
-<StartDialog app={starting} onclose={() => (starting = null)} onstart={start} />
+<StartDialog
+  app={starting}
+  onclose={() => (starting = null)}
+  onstart={start}
+  onaddquest={queueQuest}
+/>
+<SettingsDialog
+  bind:open={settingsOpen}
+  {settings}
+  onchange={(next) => void changeSettings(next)}
+/>
 <TimerDialog simulation={editingTimer} onclose={() => (editingTimer = null)} onset={setTimer} />
