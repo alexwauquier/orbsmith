@@ -137,6 +137,11 @@ export function removeFromQueue(appId: string): Promise<QueueState> {
   return invoke("remove_from_queue", { appId });
 }
 
+/** Empties the queue and stops its running games. */
+export function clearQueue(): Promise<QueueState> {
+  return invoke("clear_queue");
+}
+
 /** Moves a waiting game one place towards the front (`up`) or the back. */
 export function moveInQueue(appId: string, up: boolean): Promise<QueueState> {
   return invoke("move_in_queue", { appId, up });

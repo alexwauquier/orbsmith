@@ -7,6 +7,7 @@
   import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
   import PauseIcon from "@lucide/svelte/icons/pause";
   import PlayIcon from "@lucide/svelte/icons/play";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import XIcon from "@lucide/svelte/icons/x";
   import type { AppSummary, QueueItem, QueueState } from "$lib/api";
   import { formatCountdown, formatDuration } from "$lib/time";
@@ -17,6 +18,7 @@
     appsById,
     onstart,
     onpause,
+    onclear,
     onremove,
     onmove
   }: {
@@ -25,6 +27,8 @@
     appsById: Map<string, AppSummary>;
     onstart: () => void;
     onpause: () => void;
+    /** Empties the queue and stops its running games. */
+    onclear: () => void;
     onremove: (appId: string) => void;
     /** Moves a waiting game one place towards the front (`up`) or the back. */
     onmove: (appId: string, up: boolean) => void;
@@ -103,13 +107,23 @@
       <p class="text-xs text-muted-foreground">
         {parallel ? "All at once" : "One after another"}{queue.paused ? " · Paused" : ""}
       </p>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        class="ml-auto"
+        aria-label="Clear the queue"
+        title="Clear the queue"
+        onclick={onclear}
+      >
+        <Trash2Icon />
+      </Button>
       {#if queue.running}
-        <Button variant="outline" size="sm" class="ml-auto" onclick={onpause}>
+        <Button variant="outline" size="sm" onclick={onpause}>
           <PauseIcon data-icon="inline-start" />
           Pause
         </Button>
       {:else}
-        <Button size="sm" class="ml-auto" onclick={onstart}>
+        <Button size="sm" onclick={onstart}>
           <PlayIcon data-icon="inline-start" />
           {queue.paused ? "Resume" : "Start queue"}
         </Button>

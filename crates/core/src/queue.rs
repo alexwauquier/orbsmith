@@ -126,6 +126,15 @@ impl Queue {
         self.queued.remove(index)
     }
 
+    /// Empties the queue and resets it, as if never started. Returns the items
+    /// that were active, so the caller can stop their games.
+    pub fn clear(&mut self) -> Vec<QueueItem> {
+        self.queued.clear();
+        self.running = false;
+        self.paused = false;
+        std::mem::take(&mut self.active)
+    }
+
     /// Moves a waiting item one place towards the front (`up`) or the back.
     /// Returns whether it moved; it can't move past either end.
     pub fn move_queued(&mut self, app_id: &str, up: bool) -> bool {
@@ -636,6 +645,19 @@ mod tests {
         queue.start();
         queue.next(&running(&[]), false);
         assert!(!queue.move_queued("a", false));
+    }
+
+    #[test]
+    fn clearing_empties_and_resets_the_queue() {
+        let mut queue = queue(&["a", "b", "c"]);
+        queue.start();
+        queue.next(&running(&[]), false);
+        let stopped = queue.clear();
+        assert_eq!(stopped.len(), 1, "a's game must be stopped");
+        assert_eq!(queue.remaining(), 0);
+        assert!(!queue.is_running() && !queue.is_paused());
+        assert!(queue.next(&running(&[]), false).start.is_empty());
+        queue.add(item("a")).unwrap();
     }
 
     #[test]

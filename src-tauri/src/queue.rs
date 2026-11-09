@@ -63,6 +63,18 @@ pub async fn advance(app: &AppHandle) {
     crate::queue_changed(app);
 }
 
+/// Empties the queue and stops its running games.
+pub fn clear(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let stopped = state.queue().clear();
+    for item in &stopped {
+        // Already gone if it ended in the meantime.
+        let _ = state.simulations().stop(&item.app_id);
+    }
+    crate::simulations_changed(app);
+    crate::queue_changed(app);
+}
+
 /// Pauses the queue: its running games stop and go back to the front with
 /// the time their timer had left, so they resume where they stopped.
 pub fn pause(app: &AppHandle) {

@@ -179,6 +179,13 @@ pub fn remove_from_queue(
     state.queue().state()
 }
 
+/// Empties the queue and stops its running games.
+#[tauri::command]
+pub fn clear_queue(handle: AppHandle, state: State<'_, AppState>) -> QueueState {
+    crate::queue::clear(&handle);
+    state.queue().state()
+}
+
 /// Moves a waiting game one place up or down.
 #[tauri::command]
 pub fn move_in_queue(
