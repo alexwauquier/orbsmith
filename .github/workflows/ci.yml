@@ -1,8 +1,10 @@
 name: CI
 
+# main only receives fast-forwards of develop commits that already passed, so
+# it is not checked again; the release workflow requires that run instead.
 on:
   push:
-    branches: [develop, main]
+    branches: [develop]
   pull_request:
 
 permissions:
