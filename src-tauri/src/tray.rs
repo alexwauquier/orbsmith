@@ -19,6 +19,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             SHOW => show_main_window(app),
             STOP_ALL => {
+                // Pause the quests first, or the next one would start.
+                crate::quests::stop(app);
                 app.state::<AppState>().simulations().stop_all();
                 crate::simulations_changed(app);
             }
@@ -93,6 +95,24 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             )?);
         }
         builder = builder.text(STOP_ALL, "Stop all");
+    }
+    let remaining = {
+        let state = app.state::<AppState>();
+        let quests = state.quests();
+        quests.is_running().then(|| quests.remaining())
+    };
+    if let Some(remaining) = remaining {
+        let label = match remaining {
+            1 => "Quests: 1 left".to_owned(),
+            n => format!("Quests: {n} left"),
+        };
+        builder = builder.separator().item(&MenuItem::with_id(
+            app,
+            "quests",
+            label,
+            false,
+            None::<&str>,
+        )?);
     }
     builder.separator().text(QUIT, "Quit Orbsmith").build()
 }

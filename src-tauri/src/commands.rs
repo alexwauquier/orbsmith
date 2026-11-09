@@ -1,7 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use orbsmith_core::{AppSummary, Catalog, Os, SimulationInfo};
+use orbsmith_core::simulation::MAX_DURATION;
+use orbsmith_core::{AppSummary, Catalog, Os, Quest, QuestsState, Settings, SimulationInfo};
 use serde::{Serialize, Serializer};
 use tauri::{AppHandle, State};
 
@@ -14,6 +15,12 @@ pub struct CommandError(String);
 impl<E: std::fmt::Display> From<E> for CommandError {
     fn from(err: E) -> Self {
         Self(err.to_string())
+    }
+}
+
+impl CommandError {
+    pub fn message(&self) -> &str {
+        &self.0
     }
 }
 
@@ -95,7 +102,85 @@ pub fn set_simulation_timer(
     Ok(info)
 }
 
-async fn catalog(state: &AppState, refresh: bool) -> CommandResult<Arc<Catalog>> {
+#[tauri::command]
+pub fn get_settings(state: State<'_, AppState>) -> Settings {
+    state.settings().clone()
+}
+
+/// Saves the settings. Switching to parallel quests starts the waiting ones.
+#[tauri::command]
+pub async fn set_settings(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+    settings: Settings,
+) -> CommandResult<Settings> {
+    settings.save(&state.layout.settings_file())?;
+    *state.settings() = settings.clone();
+    crate::quests::advance(&handle).await;
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn list_quests(state: State<'_, AppState>) -> QuestsState {
+    state.quests().state()
+}
+
+/// Queues `app_id` to run for `duration_secs`, auto-stop margin included.
+#[tauri::command]
+pub async fn add_quest(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+    app_id: String,
+    duration_secs: u64,
+) -> CommandResult<QuestsState> {
+    let duration = Duration::from_secs(duration_secs);
+    if duration > MAX_DURATION {
+        return Err(orbsmith_core::Error::TimerTooLong.into());
+    }
+    let catalog = catalog(&state, false).await?;
+    let app = catalog
+        .get(&app_id)
+        .ok_or_else(|| orbsmith_core::Error::UnknownApp(app_id.clone()))?;
+    if app.target(Os::CURRENT).is_none() {
+        return Err(orbsmith_core::Error::NoExecutable(app.name.clone()).into());
+    }
+    state.quests().add(Quest {
+        app_id: app.id.clone(),
+        app_name: app.name.clone(),
+        duration,
+    })?;
+    crate::quests::advance(&handle).await;
+    crate::quests_changed(&handle);
+    Ok(state.quests().state())
+}
+
+#[tauri::command]
+pub fn remove_quest(handle: AppHandle, state: State<'_, AppState>, app_id: String) -> QuestsState {
+    state.quests().remove(&app_id);
+    crate::quests_changed(&handle);
+    state.quests().state()
+}
+
+#[tauri::command]
+pub async fn start_quests(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<QuestsState> {
+    state.quests().start();
+    crate::quests::advance(&handle).await;
+    crate::quests_changed(&handle);
+    Ok(state.quests().state())
+}
+
+/// Pauses the quests and stops their games. They go back to the front of the
+/// queue.
+#[tauri::command]
+pub fn stop_quests(handle: AppHandle, state: State<'_, AppState>) -> QuestsState {
+    crate::quests::stop(&handle);
+    state.quests().state()
+}
+
+pub(crate) async fn catalog(state: &AppState, refresh: bool) -> CommandResult<Arc<Catalog>> {
     let mut slot = state.catalog.lock().await;
     if !refresh && let Some(catalog) = slot.as_ref() {
         return Ok(catalog.clone());

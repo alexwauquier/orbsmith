@@ -1,5 +1,6 @@
 mod commands;
 mod notify;
+mod quests;
 mod state;
 mod tray;
 
@@ -7,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
-use orbsmith_core::{Layout, Os, cleanup};
+use orbsmith_core::{Layout, Os, Settings, cleanup};
 use tauri::utils::config::{AppDirectoriesOverride, AppDirectoryOverrides};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 
@@ -16,6 +17,9 @@ use crate::state::AppState;
 /// Emitted, without payload, whenever simulations start or stop, including
 /// from the tray or on their own. Listeners reload the list.
 const SIMULATIONS_CHANGED_EVENT: &str = "simulations-changed";
+
+/// Emitted, without payload, whenever the quest queue changes.
+const QUESTS_CHANGED_EVENT: &str = "quests-changed";
 
 /// Whether the "still running in the tray" notification was already shown, so
 /// that it appears once per run.
@@ -43,7 +47,11 @@ pub fn run() -> tauri::Result<()> {
                 log::info!("cleaned up {killed} orphan dummies");
             }
 
-            app.manage(AppState::new(layout, dummy_path()?));
+            let settings = Settings::load(&layout.settings_file()).unwrap_or_else(|err| {
+                log::warn!("using default settings: {err}");
+                Settings::default()
+            });
+            app.manage(AppState::new(layout, dummy_path()?, settings));
             tray::create(app.handle())?;
             tauri::async_runtime::spawn(watch_simulations(app.handle().clone()));
             Ok(())
@@ -73,6 +81,13 @@ pub fn run() -> tauri::Result<()> {
             commands::start_simulation,
             commands::stop_simulation,
             commands::set_simulation_timer,
+            commands::get_settings,
+            commands::set_settings,
+            commands::list_quests,
+            commands::add_quest,
+            commands::remove_quest,
+            commands::start_quests,
+            commands::stop_quests,
         ])
         .build(context)?
         .run(|app, event| {
@@ -114,7 +129,16 @@ pub(crate) fn simulations_changed(app: &AppHandle) {
     }
 }
 
-/// Applies auto-stop timers and notices dummies that exited, once per second.
+/// Updates the tray and tells the frontend to reload the quests.
+pub(crate) fn quests_changed(app: &AppHandle) {
+    tray::refresh(app);
+    if let Err(err) = app.emit(QUESTS_CHANGED_EVENT, ()) {
+        log::warn!("failed to emit {QUESTS_CHANGED_EVENT}: {err}");
+    }
+}
+
+/// Applies auto-stop timers, notices dummies that exited and moves the quest
+/// queue on, once per second.
 async fn watch_simulations(app: AppHandle) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
@@ -123,12 +147,12 @@ async fn watch_simulations(app: AppHandle) {
             .state::<AppState>()
             .simulations()
             .tick(SystemTime::now());
-        if ended.is_empty() {
-            continue;
+        if !ended.is_empty() {
+            for end in &ended {
+                notify::simulation_ended(&app, end);
+            }
+            simulations_changed(&app);
         }
-        for end in &ended {
-            notify::simulation_ended(&app, end);
-        }
-        simulations_changed(&app);
+        quests::advance(&app).await;
     }
 }

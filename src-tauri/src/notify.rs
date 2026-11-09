@@ -13,6 +13,22 @@ pub fn simulation_ended(app: &AppHandle, ended: &Ended) {
     show(app, &format!("{} stopped", ended.app_name), body);
 }
 
+pub fn quest_failed(app: &AppHandle, app_name: &str, reason: &str) {
+    show(
+        app,
+        &format!("Could not start {app_name}"),
+        &format!("{reason}. Moving on to the next quest."),
+    );
+}
+
+pub fn quests_done(app: &AppHandle) {
+    show(
+        app,
+        "Quests done",
+        "Every quest has run for its full duration.",
+    );
+}
+
 pub fn hidden_to_tray(app: &AppHandle, running: usize) {
     let games = if running == 1 {
         "1 game keeps".to_owned()
