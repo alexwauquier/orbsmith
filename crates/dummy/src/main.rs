@@ -2,8 +2,9 @@
 //! and runs it so that game detection sees the game as running.
 //!
 //! It does nothing but stay alive and exits as soon as the Orbsmith process
-//! that launched it is gone. On Windows it owns a window titled after the game
-//! that is never shown, so it stays out of the taskbar and Alt+Tab.
+//! that launched it is gone. On Windows it shows a 1x1 tool window titled after
+//! the game, placed off-screen: detection needs a shown window, but this one
+//! has no taskbar or Alt+Tab entry and is never seen.
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
@@ -34,10 +35,14 @@ mod platform {
         INFINITE, OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, MSG,
-        PostQuitMessage, RegisterClassW, TranslateMessage, WM_DESTROY, WNDCLASSW, WS_EX_TOOLWINDOW,
-        WS_OVERLAPPED,
+        CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, MSG, PostQuitMessage,
+        RegisterClassW, SW_SHOWNOACTIVATE, ShowWindow, TranslateMessage, WM_DESTROY, WNDCLASSW,
+        WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
     };
+
+    /// Far outside any monitor, like the position Windows gives minimized
+    /// windows.
+    const OFFSCREEN: i32 = -32000;
 
     /// Exits the process once `pid` terminates. If it is already gone, exits
     /// right away.
@@ -56,9 +61,11 @@ mod platform {
         });
     }
 
-    /// Creates the game's window without ever showing it, and runs its message
-    /// loop. A tool window that is not shown has no taskbar or Alt+Tab entry;
-    /// it exists in case detection looks at the process's windows.
+    /// Shows the game's window and runs its message loop.
+    ///
+    /// Tested against Discord on Windows 10: it only detects a process whose
+    /// window is shown. A hidden window, or a shown but fully transparent one,
+    /// is ignored. A taskbar entry is not needed, so a tool window works.
     pub fn run(title: &str) {
         let class_name = wide("OrbsmithDummy");
         let title = wide(title);
@@ -76,14 +83,14 @@ mod platform {
             RegisterClassW(&class);
 
             let window = CreateWindowExW(
-                WS_EX_TOOLWINDOW,
+                WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
                 class_name.as_ptr(),
                 title.as_ptr(),
-                WS_OVERLAPPED,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                320,
-                120,
+                WS_POPUP,
+                OFFSCREEN,
+                OFFSCREEN,
+                1,
+                1,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 instance,
@@ -92,6 +99,7 @@ mod platform {
             if window.is_null() {
                 return;
             }
+            ShowWindow(window, SW_SHOWNOACTIVATE);
 
             let mut message: MSG = std::mem::zeroed();
             while GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) > 0 {
