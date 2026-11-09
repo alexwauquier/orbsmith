@@ -18,7 +18,9 @@ Desktop app that launches stand-in processes named after game executables, so th
 
 ## Installation
 
-Orbsmith currently runs on Windows 10 and 11 (x64). Linux support is planned.
+Orbsmith runs on Windows 10 and 11 and on Linux (x64).
+
+### Windows
 
 1. Download the latest installer from the [Releases](https://github.com/alexwauquier/orbsmith/releases) page:
    - `Orbsmith_<version>_x64-setup.exe` (recommended), or
@@ -28,6 +30,18 @@ Orbsmith currently runs on Windows 10 and 11 (x64). Linux support is planned.
 The setup installs Microsoft Edge WebView2 if it is missing. It is preinstalled on Windows 11 and on up-to-date Windows 10.
 
 To update, run the installer of the new version. It detects the installed one and replaces it, keeping your data.
+
+### Linux
+
+Download the package for your distribution from the [Releases](https://github.com/alexwauquier/orbsmith/releases) page:
+
+- Debian, Ubuntu and derivatives: `Orbsmith_<version>_amd64.deb`, installed with `sudo apt install ./Orbsmith_<version>_amd64.deb`.
+- Fedora, openSUSE and derivatives: `Orbsmith-<version>-1.x86_64.rpm`, installed with `sudo dnf install ./Orbsmith-<version>-1.x86_64.rpm`.
+- Any other distribution: `Orbsmith_<version>_amd64.AppImage`. Make it executable (`chmod +x`), then run it. It may need FUSE 2 (`libfuse2` on Ubuntu).
+
+To update, install the package of the new version the same way.
+
+On GNOME, the tray icon needs the AppIndicator extension, which Ubuntu ships by default. Without it, a window closed while games run cannot be reopened until Orbsmith quits.
 
 ## Usage
 
@@ -53,10 +67,11 @@ The list of games is downloaded once and cached; use the refresh button in the h
 
 ## Data and uninstalling
 
-Orbsmith keeps its data in `%APPDATA%\Orbsmith`: the cached list of games, your settings, the queue, the stand-in executables, and the WebView data, which includes your favorites, recent games and how you last started each one.
+Orbsmith keeps its data in `%APPDATA%\Orbsmith` on Windows and `~/.local/share/orbsmith` on Linux: the cached list of games, your settings, the queue, the stand-in executables, and the WebView data, which includes your favorites, recent games and how you last started each one.
 
 - The `setup.exe` uninstaller deletes that folder if you tick **Delete the application data**.
 - The MSI uninstaller leaves it in place, as Windows Installer does for user data. Delete the folder by hand to remove it.
+- On Linux, uninstall with your package manager (`sudo apt remove orbsmith` or `sudo dnf remove orbsmith`), or delete the AppImage. The data folder is never removed: delete it by hand.
 
 ## Tech stack
 
@@ -100,7 +115,7 @@ On Linux, the Tauri app needs the [system prerequisites](https://tauri.app/start
 
 ### Releases
 
-Pushing a `v*` tag builds the Windows installers and attaches them to a draft GitHub release. The tag must match the version in `package.json`, `Cargo.toml` and `src-tauri/tauri.conf.json`.
+Pushing a `v*` tag builds the Windows installers and the Linux packages and attaches them to a draft GitHub release. The tag must match the version in `package.json`, `Cargo.toml` and `src-tauri/tauri.conf.json`, and be the newest release in `src-tauri/linux/io.github.alexwauquier.orbsmith.metainfo.xml`.
 
 ## License
 
