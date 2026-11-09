@@ -31,6 +31,12 @@ pub fn run() -> tauri::Result<()> {
     context.config_mut().app.app_directories_override = Some(app_directories());
 
     tauri::Builder::default()
+        // Registered first, so that a second launch exits before its setup
+        // runs: the startup cleanup would kill the games of the running
+        // instance. The running instance shows its window instead.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_main_window(app);
+        }))
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             if cfg!(debug_assertions) {

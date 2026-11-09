@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Linux support, with `.deb`, `.rpm` and AppImage packages. Games without a Linux executable use their Windows executable name, which is detected on Linux too.
 
+### Fixed
+
+- Starting Orbsmith while it is already running stopped every game it was running. The running instance now shows its window instead.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
