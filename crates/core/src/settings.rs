@@ -8,11 +8,22 @@ use crate::error::Error;
 
 /// User preferences, stored as JSON in the app data dir. Missing fields take
 /// their default, so older files keep loading as settings are added.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     /// Start every queued game at once instead of one after another.
     pub parallel_queue: bool,
+    /// Look for a new release at startup.
+    pub check_for_updates: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            parallel_queue: false,
+            check_for_updates: true,
+        }
+    }
 }
 
 impl Settings {
@@ -49,6 +60,7 @@ mod tests {
         let settings = Settings::load(&dir.path().join("settings.json")).unwrap();
         assert_eq!(settings, Settings::default());
         assert!(!settings.parallel_queue);
+        assert!(settings.check_for_updates);
     }
 
     #[test]
@@ -57,6 +69,7 @@ mod tests {
         let file = dir.path().join("nested").join("settings.json");
         let settings = Settings {
             parallel_queue: true,
+            check_for_updates: false,
         };
         settings.save(&file).unwrap();
         assert_eq!(Settings::load(&file).unwrap(), settings);
@@ -69,6 +82,12 @@ mod tests {
         let file = dir.path().join("settings.json");
         fs::write(&file, r#"{ "removedSetting": 1 }"#).unwrap();
         assert_eq!(Settings::load(&file).unwrap(), Settings::default());
+
+        // A file saved before a setting existed gets that setting's default.
+        fs::write(&file, r#"{ "parallelQueue": true }"#).unwrap();
+        let settings = Settings::load(&file).unwrap();
+        assert!(settings.parallel_queue);
+        assert!(settings.check_for_updates);
     }
 
     #[test]
