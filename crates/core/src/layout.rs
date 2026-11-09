@@ -22,6 +22,11 @@ impl Layout {
         self.data_dir.join("detectable-apps.json")
     }
 
+    /// User preferences.
+    pub fn settings_file(&self) -> PathBuf {
+        self.data_dir.join("settings.json")
+    }
+
     /// Root of the renamed dummy copies. Every process running from here is
     /// one of Orbsmith's dummies.
     pub fn executables_dir(&self) -> PathBuf {

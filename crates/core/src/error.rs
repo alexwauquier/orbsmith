@@ -18,6 +18,8 @@ pub enum Error {
     NotRunning(String),
     #[error("dummy executable not found at {0}")]
     MissingDummy(String),
+    #[error("invalid settings file: {0}")]
+    InvalidSettings(#[source] serde_json::Error),
     #[error("the auto-stop timer cannot exceed 7 days")]
     TimerTooLong,
     #[error("refusing to create {0}: it resolves outside the executables directory")]
