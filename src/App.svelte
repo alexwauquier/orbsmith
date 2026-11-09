@@ -10,13 +10,12 @@
   import { Separator } from "$lib/components/ui/separator";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Spinner } from "$lib/components/ui/spinner";
-  import AppIcon from "$lib/components/AppIcon.svelte";
+  import AppRow from "$lib/components/AppRow.svelte";
   import RunningCard from "$lib/components/RunningCard.svelte";
   import StartDialog from "$lib/components/StartDialog.svelte";
   import TimerDialog from "$lib/components/TimerDialog.svelte";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
   import GamepadIcon from "@lucide/svelte/icons/gamepad-2";
-  import PlayIcon from "@lucide/svelte/icons/play";
   import RefreshIcon from "@lucide/svelte/icons/refresh-cw";
   import SearchIcon from "@lucide/svelte/icons/search";
   import SearchXIcon from "@lucide/svelte/icons/search-x";
@@ -31,6 +30,8 @@
     type AppSummary,
     type Simulation
   } from "$lib/api";
+  import { resolveApps } from "$lib/library";
+  import { LibraryStore } from "$lib/library.svelte";
   import { searchApps } from "$lib/search";
   import { formatAgo } from "$lib/time";
   import logo from "../assets/logo.svg";
@@ -52,6 +53,15 @@
   const results = $derived(searchApps(apps, query, RESULT_LIMIT));
   const appsById = $derived(new Map(apps.map((app) => [app.id, app])));
   const runningIds = $derived(new Set(simulations.map((sim) => sim.appId)));
+
+  const library = new LibraryStore();
+  const favoriteApps = $derived(resolveApps(library.favorites, appsById));
+  const recentApps = $derived(
+    resolveApps(
+      library.recent.filter((id) => !library.isFavorite(id)),
+      appsById
+    )
+  );
 
   function message(err: unknown): string {
     return typeof err === "string" ? err : err instanceof Error ? err.message : String(err);
@@ -95,6 +105,7 @@
     });
     if (ok) {
       starting = null;
+      library.markStarted(app.id);
       // Reload rather than append: the change event may already have.
       await reloadSimulations();
     }
@@ -124,6 +135,16 @@
     };
   });
 </script>
+
+{#snippet row(app: AppSummary)}
+  <AppRow
+    {app}
+    running={runningIds.has(app.id)}
+    favorite={library.isFavorite(app.id)}
+    onstart={() => (starting = app)}
+    ontogglefavorite={() => library.toggleFavorite(app.id)}
+  />
+{/snippet}
 
 <div class="flex h-screen flex-col">
   <header class="flex items-center gap-3 px-4 py-3">
@@ -187,15 +208,45 @@
             {/each}
           </div>
         {:else if !query.trim()}
-          <Empty.Root>
-            <Empty.Header>
-              <Empty.Media variant="icon"><GamepadIcon /></Empty.Media>
-              <Empty.Title>Find a game</Empty.Title>
-              <Empty.Description>
-                Search by name, then start it to make it appear as running.
-              </Empty.Description>
-            </Empty.Header>
-          </Empty.Root>
+          {#if favoriteApps.length === 0 && recentApps.length === 0}
+            <Empty.Root>
+              <Empty.Header>
+                <Empty.Media variant="icon"><GamepadIcon /></Empty.Media>
+                <Empty.Title>Find a game</Empty.Title>
+                <Empty.Description>
+                  Search by name, then start it to make it appear as running. Games you start or
+                  star show up here.
+                </Empty.Description>
+              </Empty.Header>
+            </Empty.Root>
+          {:else}
+            <div class="flex flex-col gap-4">
+              {#if favoriteApps.length > 0}
+                <section class="flex flex-col gap-1" aria-labelledby="favorites-heading">
+                  <h2 id="favorites-heading" class="px-1 text-xs font-medium text-muted-foreground">
+                    Favorites
+                  </h2>
+                  <Item.Group class="gap-1">
+                    {#each favoriteApps as app (app.id)}
+                      {@render row(app)}
+                    {/each}
+                  </Item.Group>
+                </section>
+              {/if}
+              {#if recentApps.length > 0}
+                <section class="flex flex-col gap-1" aria-labelledby="recent-heading">
+                  <h2 id="recent-heading" class="px-1 text-xs font-medium text-muted-foreground">
+                    Recent
+                  </h2>
+                  <Item.Group class="gap-1">
+                    {#each recentApps as app (app.id)}
+                      {@render row(app)}
+                    {/each}
+                  </Item.Group>
+                </section>
+              {/if}
+            </div>
+          {/if}
         {:else if results.length === 0}
           <Empty.Root>
             <Empty.Header>
@@ -210,27 +261,7 @@
         {:else}
           <Item.Group class="gap-1">
             {#each results as app (app.id)}
-              <Item.Root size="sm">
-                <Item.Media variant="image">
-                  <AppIcon {app} class="size-full" />
-                </Item.Media>
-                <Item.Content class="min-w-0">
-                  <Item.Title class="w-full truncate">{app.name}</Item.Title>
-                  <Item.Description class="truncate font-mono text-xs">
-                    {app.executable}
-                  </Item.Description>
-                </Item.Content>
-                <Item.Actions>
-                  {#if runningIds.has(app.id)}
-                    <Badge variant="secondary">Running</Badge>
-                  {:else}
-                    <Button variant="secondary" size="sm" onclick={() => (starting = app)}>
-                      <PlayIcon data-icon="inline-start" />
-                      Start
-                    </Button>
-                  {/if}
-                </Item.Actions>
-              </Item.Root>
+              {@render row(app)}
             {/each}
             {#if results.length === RESULT_LIMIT}
               <p class="py-2 text-center text-xs text-muted-foreground">
