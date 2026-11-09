@@ -74,7 +74,8 @@ jobs:
           for version in \
             "$(node -p "require('./package.json').version")" \
             "$(node -p "require('./src-tauri/tauri.conf.json').version")" \
-            "$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"; do
+            "$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)" \
+            "$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' src-tauri/linux/io.github.alexwauquier.orbsmith.metainfo.xml | head -n 1)"; do
             if [ "v$version" != "$GITHUB_REF_NAME" ]; then
               echo "::error::tag $GITHUB_REF_NAME does not match version $version"
               status=1
