@@ -11,6 +11,11 @@ use crate::os::Os;
 
 pub const DETECTABLE_APPS_URL: &str = "https://discord.com/api/v10/applications/detectable";
 
+/// How long a cached list is used before Orbsmith downloads it again. New
+/// games are added to the list all the time, often right before their
+/// quests start.
+pub const MAX_CACHE_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+
 const USER_AGENT: &str = concat!(
     "Orbsmith/",
     env!("CARGO_PKG_VERSION"),
@@ -170,6 +175,13 @@ impl Catalog {
         self.apps.iter().find(|app| app.id == id)
     }
 
+    /// Whether the list is older than [`MAX_CACHE_AGE`] at `now`. A list
+    /// dated in the future, after a clock change, counts as stale too.
+    pub fn is_stale(&self, now: SystemTime) -> bool {
+        now.duration_since(self.fetched_at)
+            .map_or(true, |age| age > MAX_CACHE_AGE)
+    }
+
     /// Milliseconds since the Unix epoch.
     pub fn fetched_at_ms(&self) -> u64 {
         unix_ms(self.fetched_at)
@@ -322,6 +334,16 @@ mod tests {
         assert_eq!(summaries[2].executable, "garena/lol.exe");
         assert_eq!(summaries[2].executables.len(), 2);
         assert_eq!(summaries[0].icon_hash.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn goes_stale_after_a_day() {
+        let fetched_at = UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let catalog = Catalog::from_json(SAMPLE.as_bytes(), fetched_at).unwrap();
+        assert!(!catalog.is_stale(fetched_at));
+        assert!(!catalog.is_stale(fetched_at + MAX_CACHE_AGE));
+        assert!(catalog.is_stale(fetched_at + MAX_CACHE_AGE + Duration::from_secs(1)));
+        assert!(catalog.is_stale(fetched_at - Duration::from_secs(60)));
     }
 
     #[test]

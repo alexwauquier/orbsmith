@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use orbsmith_core::simulation::MAX_DURATION;
 use orbsmith_core::{AppSummary, Catalog, Os, QueueItem, QueueState, Settings, SimulationInfo};
@@ -41,7 +41,8 @@ pub struct AppList {
 }
 
 /// Apps that can be simulated on this platform. Uses the cache unless
-/// `refresh` is set or there is no usable cache yet.
+/// `refresh` is set, there is no usable cache yet, or it is more than a day
+/// old and a new list can be downloaded.
 #[tauri::command]
 pub async fn get_apps(state: State<'_, AppState>, refresh: bool) -> CommandResult<AppList> {
     let catalog = catalog(&state, refresh).await?;
@@ -237,7 +238,17 @@ pub(crate) async fn catalog(state: &AppState, refresh: bool) -> CommandResult<Ar
             .flatten()
     };
     let catalog = match cached {
-        Some(catalog) => catalog,
+        Some(cached) if cached.is_stale(SystemTime::now()) => {
+            // An outdated list beats none, e.g. when offline.
+            match Catalog::fetch(&cache_file).await {
+                Ok(fresh) => fresh,
+                Err(err) => {
+                    log::warn!("keeping the outdated app list: {err}");
+                    cached
+                }
+            }
+        }
+        Some(cached) => cached,
         None => Catalog::fetch(&cache_file).await?,
     };
 
