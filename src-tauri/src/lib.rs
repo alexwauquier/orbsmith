@@ -1,8 +1,10 @@
 mod commands;
+mod notify;
 mod state;
 mod tray;
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
 use orbsmith_core::{Layout, Os, cleanup};
@@ -15,12 +17,17 @@ use crate::state::AppState;
 /// from the tray or on their own. Listeners reload the list.
 const SIMULATIONS_CHANGED_EVENT: &str = "simulations-changed";
 
+/// Whether the "still running in the tray" notification was already shown, so
+/// that it appears once per run.
+static TOLD_HIDDEN: AtomicBool = AtomicBool::new(false);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> tauri::Result<()> {
     let mut context = tauri::generate_context!();
     context.config_mut().app.app_directories_override = Some(app_directories());
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -53,6 +60,9 @@ pub fn run() -> tauri::Result<()> {
                     api.prevent_close();
                     if let Err(err) = window.hide() {
                         log::warn!("failed to hide the window: {err}");
+                    }
+                    if !TOLD_HIDDEN.swap(true, Ordering::Relaxed) {
+                        notify::hidden_to_tray(app, running);
                     }
                 }
             }
@@ -115,6 +125,9 @@ async fn watch_simulations(app: AppHandle) {
             .tick(SystemTime::now());
         if ended.is_empty() {
             continue;
+        }
+        for end in &ended {
+            notify::simulation_ended(&app, end);
         }
         simulations_changed(&app);
     }
