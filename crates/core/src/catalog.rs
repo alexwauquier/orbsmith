@@ -53,14 +53,16 @@ pub struct Target {
 }
 
 impl DetectableApp {
-    /// Every non-launcher executable for `os` whose name is safe to use, in
-    /// the API's order, without duplicates.
+    /// Every non-launcher executable watched on `os` whose name is safe to
+    /// use, without duplicates: by [`Os::watched_api_names`], then in the
+    /// API's order.
     pub fn targets(&self, os: Os) -> Vec<Target> {
         let mut targets: Vec<Target> = Vec::new();
-        let candidates = self
-            .executables
-            .iter()
-            .filter(|exe| exe.os == os.api_name() && !exe.is_launcher);
+        let candidates = os.watched_api_names().iter().flat_map(|api_name| {
+            self.executables
+                .iter()
+                .filter(move |exe| exe.os == *api_name && !exe.is_launcher)
+        });
         for exe in candidates {
             let Ok(path) = ExePath::parse(&exe.name, os)
                 .inspect_err(|err| log::debug!("skipping executable of {}: {err}", self.id))
@@ -258,6 +260,30 @@ mod tests {
         assert!(target.arguments.is_empty());
 
         assert_eq!(plain.target(Os::Linux).unwrap().exe.to_string(), "plain");
+    }
+
+    #[test]
+    fn linux_falls_back_to_windows_names() {
+        let catalog = catalog();
+        let names = |id: &str| -> Vec<String> {
+            catalog
+                .get(id)
+                .unwrap()
+                .targets(Os::Linux)
+                .iter()
+                .map(|target| target.exe.to_string())
+                .collect()
+        };
+        assert_eq!(names("1"), ["plain", "plain/bin/plain.exe"]);
+        assert_eq!(names("4"), ["garena/lol.exe", "league of legends.exe"]);
+        assert!(names("3").is_empty());
+
+        let ids: Vec<_> = catalog
+            .summaries(Os::Linux)
+            .into_iter()
+            .map(|summary| summary.id)
+            .collect();
+        assert_eq!(ids, ["1", "2", "4"]);
     }
 
     #[test]

@@ -23,6 +23,21 @@ impl Os {
         }
     }
 
+    /// The `os` values whose executables the detector watches on this OS, in
+    /// order of preference.
+    ///
+    /// Discord's Linux client matches running processes against the names of
+    /// every OS, so a `win32` name works there too: most games only list one.
+    /// Verified with a renamed native binary on Ubuntu. Native names are tried
+    /// first.
+    pub fn watched_api_names(self) -> &'static [&'static str] {
+        match self {
+            Os::Windows => &["win32"],
+            Os::Linux => &["linux", "win32"],
+            Os::MacOs => &["darwin"],
+        }
+    }
+
     /// Whether file paths compare case-insensitively by default.
     pub fn case_insensitive_paths(self) -> bool {
         matches!(self, Os::Windows | Os::MacOs)
