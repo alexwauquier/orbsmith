@@ -389,7 +389,8 @@
               <Empty.Title>No game found</Empty.Title>
               <Empty.Description>
                 Nothing matches “{query.trim()}” on this platform. Try another name, or refresh the
-                list.
+                list if the game is new. Some games can't be simulated at all: they are detected
+                through their store instead of an executable, so they aren't listed.
               </Empty.Description>
             </Empty.Header>
           </Empty.Root>
