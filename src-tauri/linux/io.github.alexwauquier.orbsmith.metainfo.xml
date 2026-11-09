@@ -59,6 +59,9 @@
 
   <!-- Newest first. The release workflow checks that the tagged version is listed. -->
   <releases>
+    <release version="0.5.0" date="2026-11-09">
+      <url type="details">https://github.com/alexwauquier/orbsmith/releases/tag/v0.5.0</url>
+    </release>
     <release version="0.4.0" date="2026-11-09">
       <url type="details">https://github.com/alexwauquier/orbsmith/releases/tag/v0.4.0</url>
     </release>
