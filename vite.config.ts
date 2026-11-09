@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
@@ -10,5 +11,6 @@ export default defineConfig({
   },
   // Tauri expects the dev server on this exact port and prints its own logs.
   clearScreen: false,
-  server: { port: 5173, strictPort: true }
+  server: { port: 5173, strictPort: true },
+  test: { include: ["src/**/*.test.ts"] }
 });
