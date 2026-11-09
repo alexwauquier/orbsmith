@@ -22,6 +22,9 @@ const SIMULATIONS_CHANGED_EVENT: &str = "simulations-changed";
 /// Emitted, without payload, whenever the queue changes.
 const QUEUE_CHANGED_EVENT: &str = "queue-changed";
 
+/// Size at which the log file is rotated; only the previous one is kept.
+const LOG_FILE_MAX_BYTES: u128 = 1_000_000;
+
 /// Whether the "still running in the tray" notification was already shown, so
 /// that it appears once per run.
 static TOLD_HIDDEN: AtomicBool = AtomicBool::new(false);
@@ -42,13 +45,13 @@ pub fn run() -> tauri::Result<()> {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(update::PendingUpdate::default())
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // `logs/orbsmith.log` in the data dir, to attach to bug reports.
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .max_file_size(LOG_FILE_MAX_BYTES)
+                    .build(),
+            )?;
 
             let layout = Layout::new(app.path().app_data_dir()?);
             let killed = cleanup::kill_orphans(&layout.executables_dir());
