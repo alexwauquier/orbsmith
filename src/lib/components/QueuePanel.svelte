@@ -14,14 +14,14 @@
     parallel,
     appsById,
     onstart,
-    onstop,
+    onpause,
     onremove
   }: {
     queue: QueueState;
     parallel: boolean;
     appsById: Map<string, AppSummary>;
     onstart: () => void;
-    onstop: () => void;
+    onpause: () => void;
     onremove: (appId: string) => void;
   } = $props();
 
@@ -71,17 +71,17 @@
   {:else}
     <div class="flex items-center gap-2">
       <p class="text-xs text-muted-foreground">
-        {parallel ? "All at once" : "One after another"}
+        {parallel ? "All at once" : "One after another"}{queue.paused ? " · Paused" : ""}
       </p>
       {#if queue.running}
-        <Button variant="outline" size="sm" class="ml-auto" onclick={onstop}>
+        <Button variant="outline" size="sm" class="ml-auto" onclick={onpause}>
           <PauseIcon data-icon="inline-start" />
           Pause
         </Button>
       {:else}
         <Button size="sm" class="ml-auto" onclick={onstart}>
           <PlayIcon data-icon="inline-start" />
-          Start queue
+          {queue.paused ? "Resume" : "Start queue"}
         </Button>
       {/if}
     </div>

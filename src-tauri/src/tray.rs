@@ -96,16 +96,15 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         }
         builder = builder.text(STOP_ALL, "Stop all");
     }
-    let remaining = {
+    let (remaining, paused) = {
         let state = app.state::<AppState>();
         let queue = state.queue();
-        queue.is_running().then(|| queue.remaining())
+        let shown = queue.is_running() || queue.is_paused();
+        (shown.then(|| queue.remaining()), queue.is_paused())
     };
     if let Some(remaining) = remaining {
-        let label = match remaining {
-            1 => "Queue: 1 left".to_owned(),
-            n => format!("Queue: {n} left"),
-        };
+        let title = if paused { "Queue paused" } else { "Queue" };
+        let label = format!("{title}: {remaining} left");
         builder = builder.separator().item(&MenuItem::with_id(
             app,
             "queue",

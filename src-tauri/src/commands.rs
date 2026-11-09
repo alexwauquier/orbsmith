@@ -176,11 +176,12 @@ pub async fn start_queue(
     Ok(state.queue().state())
 }
 
-/// Pauses the queue and stops its running games. They go back to the front of the
-/// queue.
+/// Pauses the queue: running games keep their timer, and nothing new starts
+/// until `start_queue` resumes it.
 #[tauri::command]
-pub fn stop_queue(handle: AppHandle, state: State<'_, AppState>) -> QueueState {
-    crate::queue::stop(&handle);
+pub fn pause_queue(handle: AppHandle, state: State<'_, AppState>) -> QueueState {
+    state.queue().pause();
+    crate::queue_changed(&handle);
     state.queue().state()
 }
 

@@ -42,6 +42,9 @@ impl From<&QueueItem> for QueueItemInfo {
 pub struct QueueState {
     /// Whether the queue is being worked through.
     pub running: bool,
+    /// Whether it was paused with items left: active games keep running, and
+    /// nothing new starts until it is resumed.
+    pub paused: bool,
     /// Items whose game was started and is still running.
     pub active: Vec<QueueItemInfo>,
     /// Items waiting their turn, in order.
@@ -65,6 +68,7 @@ pub struct Queue {
     queued: VecDeque<QueueItem>,
     active: Vec<QueueItem>,
     running: bool,
+    paused: bool,
 }
 
 impl Queue {
@@ -87,14 +91,26 @@ impl Queue {
         self.queued.remove(index)
     }
 
+    /// Starts the queue, or resumes it after a pause.
     pub fn start(&mut self) {
-        self.running = !self.queued.is_empty() || !self.active.is_empty();
+        self.running = self.remaining() > 0;
+        self.paused = false;
     }
 
-    /// Pauses the queue. Active items go back to the front, in order, and are
-    /// returned so the caller can stop their games.
+    /// Stops starting new items. Active items keep their game and timer; when
+    /// they end, the queue waits for [`Queue::start`].
+    pub fn pause(&mut self) {
+        if self.running {
+            self.running = false;
+            self.paused = true;
+        }
+    }
+
+    /// Interrupts the queue. Active items go back to the front, in order, and
+    /// are returned so the caller can stop their games.
     pub fn stop(&mut self) -> Vec<QueueItem> {
         self.running = false;
+        self.paused = self.remaining() > 0;
         let active = std::mem::take(&mut self.active);
         for item in active.iter().rev() {
             self.queued.push_front(item.clone());
@@ -114,6 +130,11 @@ impl Queue {
             ..Step::default()
         };
         if !self.running {
+            // Paused with nothing left: there is nothing to resume.
+            if self.paused && self.remaining() == 0 {
+                self.paused = false;
+                step.changed = true;
+            }
             return step;
         }
 
@@ -155,6 +176,10 @@ impl Queue {
         self.running
     }
 
+    pub fn is_paused(&self) -> bool {
+        self.paused
+    }
+
     /// Items not finished yet: active and queued.
     pub fn remaining(&self) -> usize {
         self.active.len() + self.queued.len()
@@ -163,6 +188,7 @@ impl Queue {
     pub fn state(&self) -> QueueState {
         QueueState {
             running: self.running,
+            paused: self.paused,
             active: self.active.iter().map(QueueItemInfo::from).collect(),
             queued: self.queued.iter().map(QueueItemInfo::from).collect(),
         }
@@ -286,6 +312,59 @@ mod tests {
         let order: Vec<_> = queue.state().queued.into_iter().map(|q| q.app_id).collect();
         assert_eq!(order, ["a", "b", "c", "d"]);
         assert!(queue.next(&running(&[]), false).start.is_empty());
+        assert!(queue.is_paused(), "stopped items can be resumed");
+    }
+
+    #[test]
+    fn pausing_keeps_the_running_game_and_waits() {
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        assert_eq!(started(&queue.next(&running(&[]), false)), ["a"]);
+
+        queue.pause();
+        assert!(queue.is_paused() && !queue.is_running());
+        assert_eq!(queue.state().active[0].app_id, "a", "a keeps running");
+        assert_eq!(queue.next(&running(&["a"]), false), Step::default());
+
+        // "a" ends while paused: it is done, and "b" waits.
+        let step = queue.next(&running(&[]), false);
+        assert!(step.start.is_empty() && step.changed && !step.finished);
+        assert_eq!(queue.remaining(), 1);
+        assert!(queue.is_paused());
+
+        queue.start();
+        assert!(!queue.is_paused());
+        assert_eq!(started(&queue.next(&running(&[]), false)), ["b"]);
+    }
+
+    #[test]
+    fn resuming_while_the_game_still_runs_keeps_its_place() {
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        queue.next(&running(&[]), false);
+        queue.pause();
+        queue.start();
+        // "a" is still active, so "b" keeps waiting for it.
+        assert!(queue.next(&running(&["a"]), false).start.is_empty());
+        assert_eq!(started(&queue.next(&running(&[]), false)), ["b"]);
+    }
+
+    #[test]
+    fn a_pause_with_nothing_left_clears_itself() {
+        let mut queue = queue(&["a"]);
+        queue.start();
+        queue.next(&running(&[]), false);
+        queue.pause();
+        let step = queue.next(&running(&[]), false);
+        assert!(step.changed && !step.finished);
+        assert!(!queue.is_paused() && queue.remaining() == 0);
+    }
+
+    #[test]
+    fn pausing_an_idle_queue_does_nothing() {
+        let mut queue = queue(&["a"]);
+        queue.pause();
+        assert!(!queue.is_paused());
     }
 
     #[test]
@@ -312,6 +391,7 @@ mod tests {
             queue.state(),
             QueueState {
                 running: false,
+                paused: false,
                 active: vec![],
                 queued: vec![QueueItemInfo {
                     app_id: "a".into(),

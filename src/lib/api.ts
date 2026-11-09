@@ -46,6 +46,8 @@ export interface QueueItem {
 export interface QueueState {
   /** Whether the queue is being worked through. */
   running: boolean;
+  /** Paused with items left: running games keep going, nothing new starts. */
+  paused: boolean;
   /** Items whose game is running. */
   active: QueueItem[];
   /** Items waiting their turn, in order. */
@@ -120,9 +122,9 @@ export function startQueue(): Promise<QueueState> {
   return invoke("start_queue");
 }
 
-/** Pauses the queue and stops its running games; they go back to the front. */
-export function stopQueue(): Promise<QueueState> {
-  return invoke("stop_queue");
+/** Running games keep their timer; nothing new starts until `startQueue`. */
+export function pauseQueue(): Promise<QueueState> {
+  return invoke("pause_queue");
 }
 
 /** Mirrors `QUEUE_CHANGED_EVENT` in `src-tauri/src/lib.rs`. */

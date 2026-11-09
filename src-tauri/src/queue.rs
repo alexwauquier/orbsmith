@@ -57,7 +57,8 @@ pub async fn advance(app: &AppHandle) {
     crate::queue_changed(app);
 }
 
-/// Pauses the queue and stops its running games.
+/// Interrupts the queue and stops its running games, which go back to the
+/// front. Used by Stop all; the queue can then be resumed.
 pub fn stop(app: &AppHandle) {
     let state = app.state::<AppState>();
     let stopped = state.queue().stop();

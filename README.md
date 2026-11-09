@@ -33,7 +33,7 @@ To update, run the installer of the new version. It detects the installed one an
 
 ### Queue
 
-To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps it at the top of the list; stopping a queued game from the **Running** tab skips to the next one.
+To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** lets the current game finish its timer but starts nothing new until you click **Resume**; stopping a queued game from the **Running** tab skips to the next one. **Stop all** in the tray menu stops the games and puts them back at the top of the queue.
 
 To run every game in the queue at the same time instead, turn on **Run the queue in parallel** in the settings (gear icon in the header).
 

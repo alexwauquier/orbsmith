@@ -87,7 +87,7 @@ pub fn run() -> tauri::Result<()> {
             commands::add_to_queue,
             commands::remove_from_queue,
             commands::start_queue,
-            commands::stop_queue,
+            commands::pause_queue,
         ])
         .build(context)?
         .run(|app, event| {

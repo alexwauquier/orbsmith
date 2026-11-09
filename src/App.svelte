@@ -35,7 +35,7 @@
     removeFromQueue,
     setSettings,
     startQueue,
-    stopQueue,
+    pauseQueue,
     setSimulationTimer,
     startSimulation,
     stopSimulation,
@@ -63,7 +63,7 @@
   let now = $state(Date.now());
   let starting = $state<AppSummary | null>(null);
   let editingTimer = $state<Simulation | null>(null);
-  let queue = $state.raw<QueueState>({ running: false, active: [], queued: [] });
+  let queue = $state.raw<QueueState>({ running: false, paused: false, active: [], queued: [] });
   let settings = $state.raw<Settings>({ parallelQueue: false });
   let settingsOpen = $state(false);
   let sideTab = $state("running");
@@ -381,9 +381,9 @@
                 void attempt(async () => {
                   queue = await startQueue();
                 })}
-              onstop={() =>
+              onpause={() =>
                 void attempt(async () => {
-                  queue = await stopQueue();
+                  queue = await pauseQueue();
                 })}
               onremove={(appId) =>
                 void attempt(async () => {
