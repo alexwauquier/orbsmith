@@ -53,26 +53,48 @@ pub struct Target {
 }
 
 impl DetectableApp {
-    /// The first non-launcher executable for `os` whose name is safe to use.
-    pub fn target(&self, os: Os) -> Option<Target> {
-        self.executables
+    /// Every non-launcher executable for `os` whose name is safe to use, in
+    /// the API's order, without duplicates.
+    pub fn targets(&self, os: Os) -> Vec<Target> {
+        let mut targets: Vec<Target> = Vec::new();
+        let candidates = self
+            .executables
             .iter()
-            .filter(|exe| exe.os == os.api_name() && !exe.is_launcher)
-            .find_map(|exe| {
-                let path = ExePath::parse(&exe.name, os)
-                    .inspect_err(|err| log::debug!("skipping executable of {}: {err}", self.id))
-                    .ok()?;
-                Some(Target {
-                    exe: path,
-                    arguments: exe
-                        .arguments
-                        .as_deref()
-                        .unwrap_or_default()
-                        .split_whitespace()
-                        .map(str::to_owned)
-                        .collect(),
-                })
-            })
+            .filter(|exe| exe.os == os.api_name() && !exe.is_launcher);
+        for exe in candidates {
+            let Ok(path) = ExePath::parse(&exe.name, os)
+                .inspect_err(|err| log::debug!("skipping executable of {}: {err}", self.id))
+            else {
+                continue;
+            };
+            if targets.iter().any(|target| target.exe == path) {
+                continue;
+            }
+            targets.push(Target {
+                exe: path,
+                arguments: exe
+                    .arguments
+                    .as_deref()
+                    .unwrap_or_default()
+                    .split_whitespace()
+                    .map(str::to_owned)
+                    .collect(),
+            });
+        }
+        targets
+    }
+
+    /// The default executable for `os`: the first of [`Self::targets`].
+    pub fn target(&self, os: Os) -> Option<Target> {
+        self.targets(os).into_iter().next()
+    }
+
+    /// The executable for `os` whose path reads `name`, as listed in
+    /// [`AppSummary::executables`].
+    pub fn target_named(&self, os: Os, name: &str) -> Option<Target> {
+        self.targets(os)
+            .into_iter()
+            .find(|target| target.exe.to_string() == name)
     }
 }
 
@@ -84,7 +106,10 @@ pub struct AppSummary {
     pub name: String,
     pub icon_hash: Option<String>,
     pub aliases: Vec<String>,
+    /// The executable simulated by default.
     pub executable: String,
+    /// Every executable that can be simulated, the default first.
+    pub executables: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -152,13 +177,18 @@ impl Catalog {
         self.apps
             .iter()
             .filter_map(|app| {
-                let target = app.target(os)?;
+                let executables: Vec<String> = app
+                    .targets(os)
+                    .iter()
+                    .map(|target| target.exe.to_string())
+                    .collect();
                 Some(AppSummary {
                     id: app.id.clone(),
                     name: app.name.clone(),
                     icon_hash: app.icon_hash.clone(),
                     aliases: app.aliases.clone(),
-                    executable: target.exe.to_string(),
+                    executable: executables.first()?.clone(),
+                    executables,
                 })
             })
             .collect()
@@ -197,6 +227,16 @@ mod tests {
             ]
         },
         {
+            "id": "4",
+            "name": "Several",
+            "executables": [
+                {"os": "win32", "name": "garena/lol.exe", "is_launcher": false},
+                {"os": "win32", "name": "league of legends.exe", "is_launcher": false},
+                {"os": "win32", "name": "garena/lol.exe", "is_launcher": false},
+                {"os": "win32", "name": ">league of legends.exe", "is_launcher": false}
+            ]
+        },
+        {
             "id": "3",
             "name": "Mac only",
             "icon_hash": null,
@@ -221,6 +261,25 @@ mod tests {
     }
 
     #[test]
+    fn lists_every_executable_once_and_finds_one_by_name() {
+        let catalog = catalog();
+        let several = catalog.get("4").unwrap();
+        let names: Vec<_> = several
+            .targets(Os::Windows)
+            .iter()
+            .map(|target| target.exe.to_string())
+            .collect();
+        assert_eq!(names, ["garena/lol.exe", "league of legends.exe"]);
+        assert_eq!(
+            several
+                .target_named(Os::Windows, "league of legends.exe")
+                .map(|target| target.exe.to_string()),
+            Some("league of legends.exe".to_owned())
+        );
+        assert!(several.target_named(Os::Windows, "other.exe").is_none());
+    }
+
+    #[test]
     fn splits_arguments_and_strips_match_hint() {
         let target = catalog().get("2").unwrap().target(Os::Windows).unwrap();
         assert_eq!(target.exe.to_string(), "hl2.exe");
@@ -231,8 +290,11 @@ mod tests {
     fn summaries_only_include_simulatable_apps() {
         let summaries = catalog().summaries(Os::Windows);
         let ids: Vec<_> = summaries.iter().map(|s| s.id.as_str()).collect();
-        assert_eq!(ids, ["1", "2"]);
+        assert_eq!(ids, ["1", "2", "4"]);
         assert_eq!(summaries[0].executable, "plain/bin/plain.exe");
+        assert_eq!(summaries[0].executables, ["plain/bin/plain.exe"]);
+        assert_eq!(summaries[2].executable, "garena/lol.exe");
+        assert_eq!(summaries[2].executables.len(), 2);
         assert_eq!(summaries[0].icon_hash.as_deref(), Some("abc"));
     }
 

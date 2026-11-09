@@ -56,23 +56,27 @@ pub fn list_simulations(state: State<'_, AppState>) -> Vec<SimulationInfo> {
     state.simulations().list()
 }
 
-/// Starts simulating an app. With `duration_secs`, it stops automatically
-/// after that long.
+/// Starts simulating an app, as `executable` (one of its summary's
+/// `executables`) or its default one. With `duration_secs`, it stops
+/// automatically after that long.
 #[tauri::command]
 pub async fn start_simulation(
     handle: AppHandle,
     state: State<'_, AppState>,
     app_id: String,
     duration_secs: Option<u64>,
+    executable: Option<String>,
 ) -> CommandResult<SimulationInfo> {
     let catalog = catalog(&state, false).await?;
     let app = catalog
         .get(&app_id)
         .ok_or_else(|| orbsmith_core::Error::UnknownApp(app_id.clone()))?;
-    let info =
-        state
-            .simulations()
-            .start(app, Os::CURRENT, duration_secs.map(Duration::from_secs))?;
+    let info = state.simulations().start(
+        app,
+        Os::CURRENT,
+        executable.as_deref(),
+        duration_secs.map(Duration::from_secs),
+    )?;
     crate::simulations_changed(&handle);
     Ok(info)
 }
@@ -125,13 +129,15 @@ pub fn list_queue(state: State<'_, AppState>) -> QueueState {
     state.queue().state()
 }
 
-/// Queues `app_id` to run for `duration_secs`.
+/// Queues `app_id` to run for `duration_secs`, as `executable` or its
+/// default one.
 #[tauri::command]
 pub async fn add_to_queue(
     handle: AppHandle,
     state: State<'_, AppState>,
     app_id: String,
     duration_secs: u64,
+    executable: Option<String>,
 ) -> CommandResult<QueueState> {
     let duration = Duration::from_secs(duration_secs);
     if duration > MAX_DURATION {
@@ -141,12 +147,22 @@ pub async fn add_to_queue(
     let app = catalog
         .get(&app_id)
         .ok_or_else(|| orbsmith_core::Error::UnknownApp(app_id.clone()))?;
-    if app.target(Os::CURRENT).is_none() {
-        return Err(orbsmith_core::Error::NoExecutable(app.name.clone()).into());
+    match executable.as_deref() {
+        Some(name) if app.target_named(Os::CURRENT, name).is_none() => {
+            return Err(orbsmith_core::Error::UnknownExecutable {
+                app: app.name.clone(),
+                executable: name.to_owned(),
+            }
+            .into());
+        }
+        None if app.target(Os::CURRENT).is_none() => {
+            return Err(orbsmith_core::Error::NoExecutable(app.name.clone()).into());
+        }
+        _ => {}
     }
-    state
-        .queue()
-        .add(QueueItem::new(app.id.clone(), app.name.clone(), duration))?;
+    state.queue().add(
+        QueueItem::new(app.id.clone(), app.name.clone(), duration).with_executable(executable),
+    )?;
     crate::queue::advance(&handle).await;
     crate::queue_changed(&handle);
     Ok(state.queue().state())

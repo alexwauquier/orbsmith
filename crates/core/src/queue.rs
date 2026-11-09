@@ -23,6 +23,8 @@ pub struct QueueItem {
     /// Time left after a pause interrupted the game; it runs for this long
     /// when resumed.
     pub left: Option<Duration>,
+    /// The executable to run, if not the app's default.
+    pub executable: Option<String>,
 }
 
 impl QueueItem {
@@ -32,7 +34,14 @@ impl QueueItem {
             app_name: app_name.into(),
             duration,
             left: None,
+            executable: None,
         }
+    }
+
+    /// Runs as `executable` instead of the app's default one.
+    pub fn with_executable(mut self, executable: Option<String>) -> Self {
+        self.executable = executable;
+        self
     }
 
     /// How long the game should run when started: the time left after a
@@ -303,6 +312,8 @@ struct SavedItem {
     duration_secs: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     left_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    executable: Option<String>,
 }
 
 impl From<&QueueItem> for SavedItem {
@@ -314,6 +325,7 @@ impl From<&QueueItem> for SavedItem {
             left_ms: item
                 .left
                 .map(|left| u64::try_from(left.as_millis()).unwrap_or(u64::MAX)),
+            executable: item.executable.clone(),
         }
     }
 }
@@ -327,6 +339,7 @@ impl From<SavedItem> for QueueItem {
                 saved.app_name,
                 Duration::from_secs(saved.duration_secs),
             )
+            .with_executable(saved.executable)
         }
     }
 }
@@ -540,6 +553,27 @@ mod tests {
             state.queued[0].left_secs, None,
             "a restarts from the beginning"
         );
+    }
+
+    #[test]
+    fn keeps_the_chosen_executable_across_restarts() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("queue.json");
+        let mut queue = Queue::new();
+        queue
+            .add(item("a").with_executable(Some("league of legends.exe".into())))
+            .unwrap();
+        queue.add(item("b")).unwrap();
+        queue.save(&file).unwrap();
+
+        let mut restored = Queue::load(&file).unwrap();
+        restored.start();
+        let step = restored.next(&running(&[]), true);
+        assert_eq!(
+            step.start[0].executable.as_deref(),
+            Some("league of legends.exe")
+        );
+        assert_eq!(step.start[1].executable, None);
     }
 
     #[test]

@@ -120,9 +120,13 @@
     });
   }
 
-  async function start(app: AppSummary, durationSecs: number | undefined) {
+  async function start(
+    app: AppSummary,
+    durationSecs: number | undefined,
+    executable: string | undefined
+  ) {
     const ok = await attempt(async () => {
-      await startSimulation(app.id, durationSecs);
+      await startSimulation(app.id, durationSecs, executable);
     });
     if (ok) {
       starting = null;
@@ -151,9 +155,9 @@
     });
   }
 
-  async function enqueue(app: AppSummary, durationSecs: number) {
+  async function enqueue(app: AppSummary, durationSecs: number, executable: string | undefined) {
     const ok = await attempt(async () => {
-      queue = await addToQueue(app.id, durationSecs);
+      queue = await addToQueue(app.id, durationSecs, executable);
     });
     if (ok) {
       starting = null;

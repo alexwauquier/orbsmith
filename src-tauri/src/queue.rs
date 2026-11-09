@@ -36,7 +36,12 @@ pub async fn advance(app: &AppHandle) {
                     None => Err(format!("{} is no longer in the game list", item.app_name)),
                     Some(detectable) => state
                         .simulations()
-                        .start(detectable, Os::CURRENT, Some(item.run_time()))
+                        .start(
+                            detectable,
+                            Os::CURRENT,
+                            item.executable.as_deref(),
+                            Some(item.run_time()),
+                        )
                         .map(|_| ())
                         .map_err(|err| err.to_string()),
                 },

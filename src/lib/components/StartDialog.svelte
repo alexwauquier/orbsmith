@@ -4,6 +4,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Checkbox } from "$lib/components/ui/checkbox";
   import { Input } from "$lib/components/ui/input";
+  import * as Select from "$lib/components/ui/select";
   import { Spinner } from "$lib/components/ui/spinner";
   import AppIcon from "$lib/components/AppIcon.svelte";
   import ListPlusIcon from "@lucide/svelte/icons/list-plus";
@@ -18,9 +19,17 @@
     app: AppSummary | null;
     onclose: () => void;
     /** Resolves once the simulation started; the dialog stays open on error. */
-    onstart: (app: AppSummary, durationSecs: number | undefined) => Promise<void>;
+    onstart: (
+      app: AppSummary,
+      durationSecs: number | undefined,
+      executable: string | undefined
+    ) => Promise<void>;
     /** Resolves once the game is queued; the dialog stays open on error. */
-    onenqueue: (app: AppSummary, durationSecs: number) => Promise<void>;
+    onenqueue: (
+      app: AppSummary,
+      durationSecs: number,
+      executable: string | undefined
+    ) => Promise<void>;
   } = $props();
 
   let minutes = $state(15);
@@ -32,6 +41,11 @@
   );
 
   const durationSecs = $derived(minutes * 60);
+
+  // Resets to the default whenever another app is opened.
+  let executable = $derived(app?.executable ?? "");
+  /** Only a non-default choice is sent, so the default can follow the catalog. */
+  const chosenExecutable = $derived(app && executable !== app.executable ? executable : undefined);
 
   async function run(action: () => Promise<void>) {
     busy = true;
@@ -46,13 +60,13 @@
     event.preventDefault();
     const target = app;
     if (!target || !valid) return;
-    void run(() => onstart(target, autoStop ? durationSecs : undefined));
+    void run(() => onstart(target, autoStop ? durationSecs : undefined, chosenExecutable));
   }
 
   function addToQueue() {
     const target = app;
     if (!target || !valid || !autoStop) return;
-    void run(() => onenqueue(target, durationSecs));
+    void run(() => onenqueue(target, durationSecs, chosenExecutable));
   }
 </script>
 
@@ -72,12 +86,33 @@
           <div class="flex min-w-0 flex-col gap-1">
             <Dialog.Title class="truncate">{app.name}</Dialog.Title>
             <Dialog.Description class="truncate font-mono text-xs">
-              {app.executable}
+              {executable}
             </Dialog.Description>
           </div>
         </Dialog.Header>
 
         <Field.FieldGroup>
+          {#if app.executables.length > 1}
+            <Field.Field>
+              <Field.FieldLabel for="executable">Executable</Field.FieldLabel>
+              <Select.Root type="single" bind:value={executable}>
+                <Select.Trigger id="executable" class="w-full font-mono text-xs">
+                  <span class="truncate">{executable}</span>
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each app.executables as name (name)}
+                      <Select.Item value={name} label={name} class="font-mono text-xs" />
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+              </Select.Root>
+              <Field.FieldDescription>
+                If the game isn't detected, try another one: games list several, for other stores or
+                versions.
+              </Field.FieldDescription>
+            </Field.Field>
+          {/if}
           <Field.Field orientation="horizontal">
             <Checkbox id="auto-stop" bind:checked={autoStop} />
             <Field.FieldLabel for="auto-stop">Stop automatically</Field.FieldLabel>

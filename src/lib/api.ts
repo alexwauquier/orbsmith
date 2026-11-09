@@ -7,8 +7,10 @@ export interface AppSummary {
   name: string;
   iconHash: string | null;
   aliases: string[];
-  /** Executable path the dummy runs as, e.g. `game/bin/game.exe`. */
+  /** Executable path the dummy runs as by default, e.g. `game/bin/game.exe`. */
   executable: string;
+  /** Every executable that can be simulated, the default first. */
+  executables: string[];
 }
 
 export interface AppList {
@@ -65,9 +67,20 @@ export function listSimulations(): Promise<Simulation[]> {
   return invoke("list_simulations");
 }
 
-/** With `durationSecs`, the simulation stops automatically after that long. */
-export function startSimulation(appId: string, durationSecs?: number): Promise<Simulation> {
-  return invoke("start_simulation", { appId, durationSecs: durationSecs ?? null });
+/**
+ * With `durationSecs`, the simulation stops automatically after that long.
+ * `executable` is one of the app's `executables`; the default one otherwise.
+ */
+export function startSimulation(
+  appId: string,
+  durationSecs?: number,
+  executable?: string
+): Promise<Simulation> {
+  return invoke("start_simulation", {
+    appId,
+    durationSecs: durationSecs ?? null,
+    executable: executable ?? null
+  });
 }
 
 export function stopSimulation(appId: string): Promise<void> {
@@ -111,9 +124,13 @@ export function listQueue(): Promise<QueueState> {
   return invoke("list_queue");
 }
 
-/** Queues `appId` to run for `durationSecs`. */
-export function addToQueue(appId: string, durationSecs: number): Promise<QueueState> {
-  return invoke("add_to_queue", { appId, durationSecs });
+/** Queues `appId` to run for `durationSecs`, as `executable` or the default one. */
+export function addToQueue(
+  appId: string,
+  durationSecs: number,
+  executable?: string
+): Promise<QueueState> {
+  return invoke("add_to_queue", { appId, durationSecs, executable: executable ?? null });
 }
 
 export function removeFromQueue(appId: string): Promise<QueueState> {

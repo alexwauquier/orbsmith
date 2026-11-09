@@ -12,6 +12,8 @@ pub enum Error {
     UnknownApp(String),
     #[error("{0} has no executable that can be simulated on this platform")]
     NoExecutable(String),
+    #[error("{app} has no executable named {executable}")]
+    UnknownExecutable { app: String, executable: String },
     #[error("{0} is already running")]
     AlreadyRunning(String),
     #[error("no simulation is running for {0}")]

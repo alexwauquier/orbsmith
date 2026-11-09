@@ -3,7 +3,8 @@ import type { AppSummary } from "$lib/api";
 import { searchApps } from "$lib/search";
 
 function app(name: string, aliases: string[] = []): AppSummary {
-  return { id: name, name, iconHash: null, aliases, executable: `${name}.exe` };
+  const executable = `${name}.exe`;
+  return { id: name, name, iconHash: null, aliases, executable, executables: [executable] };
 }
 
 const names = (apps: AppSummary[]) => apps.map((found) => found.name);

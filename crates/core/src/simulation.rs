@@ -116,20 +116,30 @@ impl Simulations {
         }
     }
 
-    /// Launches a dummy for `app`, stopped automatically after `duration` if
-    /// given.
+    /// Launches a dummy for `app`, as `executable` (one of
+    /// [`AppSummary::executables`](crate::AppSummary::executables)) or the
+    /// default one, stopped automatically after `duration` if given.
     pub fn start(
         &mut self,
         app: &DetectableApp,
         os: Os,
+        executable: Option<&str>,
         duration: Option<Duration>,
     ) -> Result<SimulationInfo, Error> {
         if self.running.contains_key(&app.id) {
             return Err(Error::AlreadyRunning(app.name.clone()));
         }
-        let target = app
-            .target(os)
-            .ok_or_else(|| Error::NoExecutable(app.name.clone()))?;
+        let target = match executable {
+            Some(name) => app
+                .target_named(os, name)
+                .ok_or_else(|| Error::UnknownExecutable {
+                    app: app.name.clone(),
+                    executable: name.to_owned(),
+                })?,
+            None => app
+                .target(os)
+                .ok_or_else(|| Error::NoExecutable(app.name.clone()))?,
+        };
         let now = SystemTime::now();
         let stop_at = deadline(now, duration)?;
 
@@ -306,9 +316,39 @@ mod tests {
     }
 
     #[test]
+    fn starts_the_chosen_executable() {
+        let other = if cfg!(windows) {
+            "other/game.exe"
+        } else {
+            "other/game"
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let mut sims = Simulations::new(test_binary(), dir.path().join("executables"));
+        let json = format!(
+            r#"[{{"id": "42", "name": "Game", "executables": [
+                {{"os": "{os}", "name": "{EXE}", "is_launcher": false, "arguments": "{HELPER_ARGS}"}},
+                {{"os": "{os}", "name": "{other}", "is_launcher": false, "arguments": "{HELPER_ARGS}"}}
+            ]}}]"#,
+            os = Os::CURRENT.api_name()
+        );
+        let catalog = Catalog::from_json(json.as_bytes(), UNIX_EPOCH).unwrap();
+        let app = catalog.get("42").unwrap();
+
+        assert!(matches!(
+            sims.start(app, Os::CURRENT, Some("missing.exe"), None),
+            Err(Error::UnknownExecutable { .. })
+        ));
+        let info = sims.start(app, Os::CURRENT, Some(other), None).unwrap();
+        assert_eq!(info.executable, other);
+        assert!(dir.path().join("executables").join(other).exists());
+        assert!(!dir.path().join("executables").join(EXE).exists());
+        sims.stop("42").unwrap();
+    }
+
+    #[test]
     fn starts_copy_under_exe_name_and_stops_it() {
         let (dir, mut sims, app) = setup("Game");
-        let info = sims.start(&app, Os::CURRENT, None).unwrap();
+        let info = sims.start(&app, Os::CURRENT, None, None).unwrap();
 
         assert!(dir.path().join("executables").join(EXE).exists());
         assert_eq!(info.executable, EXE);
@@ -332,7 +372,7 @@ mod tests {
         std::os::unix::fs::symlink(outside.path(), &game).unwrap();
 
         assert!(matches!(
-            sims.start(&app, Os::CURRENT, None),
+            sims.start(&app, Os::CURRENT, None, None),
             Err(Error::OutsideExecutablesDir(_))
         ));
         assert!(!outside.path().join("bin").exists());
@@ -343,7 +383,7 @@ mod tests {
         let (dir, _, app) = setup("Game");
         let mut sims = Simulations::new(dir.path().join("missing"), dir.path().join("executables"));
         assert!(matches!(
-            sims.start(&app, Os::CURRENT, None),
+            sims.start(&app, Os::CURRENT, None, None),
             Err(Error::MissingDummy(_))
         ));
     }
@@ -351,9 +391,9 @@ mod tests {
     #[test]
     fn refuses_to_start_twice() {
         let (_dir, mut sims, app) = setup("Game");
-        sims.start(&app, Os::CURRENT, None).unwrap();
+        sims.start(&app, Os::CURRENT, None, None).unwrap();
         assert!(matches!(
-            sims.start(&app, Os::CURRENT, None),
+            sims.start(&app, Os::CURRENT, None, None),
             Err(Error::AlreadyRunning(_))
         ));
     }
@@ -362,7 +402,7 @@ mod tests {
     fn timer_stops_the_dummy() {
         let (_dir, mut sims, app) = setup("Game");
         let info = sims
-            .start(&app, Os::CURRENT, Some(Duration::from_secs(60)))
+            .start(&app, Os::CURRENT, None, Some(Duration::from_secs(60)))
             .unwrap();
         assert!(info.stop_at.unwrap() >= info.started_at + 60_000);
 
@@ -382,7 +422,7 @@ mod tests {
     #[test]
     fn set_timer_replaces_the_deadline() {
         let (_dir, mut sims, app) = setup("Game");
-        sims.start(&app, Os::CURRENT, Some(Duration::from_secs(1)))
+        sims.start(&app, Os::CURRENT, None, Some(Duration::from_secs(1)))
             .unwrap();
         let info = sims.set_timer("42", None).unwrap();
         assert_eq!(info.stop_at, None);
@@ -397,12 +437,13 @@ mod tests {
         let (_dir, mut sims, app) = setup("Too long");
         let too_long = Some(MAX_DURATION + Duration::from_secs(1));
         assert!(matches!(
-            sims.start(&app, Os::CURRENT, too_long),
+            sims.start(&app, Os::CURRENT, None, too_long),
             Err(Error::TimerTooLong)
         ));
         assert!(sims.list().is_empty());
 
-        sims.start(&app, Os::CURRENT, Some(MAX_DURATION)).unwrap();
+        sims.start(&app, Os::CURRENT, None, Some(MAX_DURATION))
+            .unwrap();
         assert!(matches!(
             sims.set_timer("42", Some(Duration::MAX)),
             Err(Error::TimerTooLong)
@@ -412,7 +453,7 @@ mod tests {
     #[test]
     fn detects_dummy_that_exited() {
         let (_dir, mut sims, app) = setup(EXIT_AT_ONCE);
-        let pid = sims.start(&app, Os::CURRENT, None).unwrap().pid;
+        let pid = sims.start(&app, Os::CURRENT, None, None).unwrap().pid;
 
         let deadline = SystemTime::now() + Duration::from_secs(10);
         let ended = loop {
@@ -430,7 +471,7 @@ mod tests {
     #[test]
     fn drop_kills_everything() {
         let (_dir, mut sims, app) = setup("Game");
-        let pid = sims.start(&app, Os::CURRENT, None).unwrap().pid;
+        let pid = sims.start(&app, Os::CURRENT, None, None).unwrap().pid;
         drop(sims);
         assert!(!is_alive(pid));
     }
