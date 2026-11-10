@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In-app updates. Orbsmith checks GitHub for a new version at startup, shows what's new, and installs it when you choose to. Updates are signed, and a download whose signature does not match is refused. The check can be turned off in the settings, which also have a **Check now** button.
 - Release files come with a build provenance attestation, to check with `gh attestation verify` that they were built from this repository.
 - A log file, `logs/orbsmith.log` in the data folder, to attach to bug reports.
+- A wait between queued games, set in minutes, with a countdown in the **Queue** tab.
+- **Vary times**: queued games run up to 10% longer than their duration, never shorter, and each wait between games is up to 50% shorter or longer.
 
 ### Changed
 

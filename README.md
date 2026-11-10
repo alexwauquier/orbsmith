@@ -65,6 +65,8 @@ To run several games in a row, choose **Add to queue** instead of **Start now**:
 
 To run every game in the queue at the same time instead, turn on **Run the queue in parallel** in the settings (gear icon in the header).
 
+Two more settings make the queue's timing less regular. **Wait between games** pauses for that many minutes after each game before starting the next one, with a countdown in the **Queue** tab. **Vary times** makes each game run up to 10% longer than its duration, never shorter, so a quest still gets its full time, and each wait up to 50% shorter or longer.
+
 Simulated games run in the background: they don't appear in the taskbar. A notification tells you when one stops on its own.
 
 Closing the window while games are running keeps Orbsmith in the system tray, so they keep running. Click the tray icon to reopen it; its menu also stops every game or quits. With nothing running, closing the window quits Orbsmith. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
