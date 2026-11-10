@@ -150,6 +150,8 @@ impl Catalog {
     pub async fn fetch(cache_file: &Path) -> Result<Self, Error> {
         let client = reqwest::Client::builder()
             .user_agent(USER_AGENT)
+            // Fails fast when offline, so a stale cache is used without delay.
+            .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(60))
             .build()?;
         let json = client
