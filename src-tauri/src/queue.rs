@@ -21,8 +21,13 @@ pub async fn advance(app: &AppHandle) {
         .into_iter()
         .map(|sim| sim.app_id)
         .collect();
-    let parallel = state.settings().parallel_queue;
-    let step = state.queue().next(&running, parallel);
+    let pacing = state.settings().pacing();
+    let step = state.queue().next(
+        &running,
+        &pacing,
+        SystemTime::now(),
+        &mut orbsmith_core::queue::random_fraction,
+    );
     if !step.changed {
         return;
     }

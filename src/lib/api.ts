@@ -36,7 +36,14 @@ export interface Settings {
   parallelQueue: boolean;
   /** Look for a new release at startup. */
   checkForUpdates: boolean;
+  /** Wait between two games of the queue when they run one after another. */
+  queueGapSecs: number;
+  /** Queued games run a little longer than their duration, and waits vary. */
+  varyQueueTimes: boolean;
 }
+
+/** Longest wait between queued games (`orbsmith_core::queue::MAX_GAP`, 24 hours). */
+export const MAX_GAP_MINUTES = 24 * 60;
 
 /** Mirrors `UpdateInfo` in `src-tauri/src/update.rs`. */
 export interface UpdateInfo {
@@ -66,6 +73,8 @@ export interface QueueState {
   active: QueueItem[];
   /** Items waiting their turn, in order. */
   queued: QueueItem[];
+  /** While waiting between two games: when the next one starts, in milliseconds since the Unix epoch. */
+  nextStartAt: number | null;
 }
 
 /** Uses the cached list unless `refresh` is set or there is no cache yet. */

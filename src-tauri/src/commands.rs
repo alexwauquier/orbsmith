@@ -112,13 +112,15 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
     state.settings().clone()
 }
 
-/// Saves the settings. Switching the queue to parallel starts the waiting games.
+/// Saves the settings. Switching the queue to parallel starts the waiting
+/// games, and a new wait between games applies from the next one.
 #[tauri::command]
 pub async fn set_settings(
     handle: AppHandle,
     state: State<'_, AppState>,
     settings: Settings,
 ) -> CommandResult<Settings> {
+    settings.validate()?;
     settings.save(&state.layout.settings_file())?;
     *state.settings() = settings.clone();
     crate::queue::advance(&handle).await;

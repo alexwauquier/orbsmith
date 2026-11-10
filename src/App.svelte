@@ -70,8 +70,19 @@
   let now = $state(Date.now());
   let starting = $state<AppSummary | null>(null);
   let editingTimer = $state<Simulation | null>(null);
-  let queue = $state.raw<QueueState>({ running: false, paused: false, active: [], queued: [] });
-  let settings = $state.raw<Settings>({ parallelQueue: false, checkForUpdates: true });
+  let queue = $state.raw<QueueState>({
+    running: false,
+    paused: false,
+    active: [],
+    queued: [],
+    nextStartAt: null
+  });
+  let settings = $state.raw<Settings>({
+    parallelQueue: false,
+    checkForUpdates: true,
+    queueGapSecs: 0,
+    varyQueueTimes: false
+  });
   let settingsOpen = $state(false);
   /** The newer release found by the last check. */
   let update = $state.raw<UpdateInfo | null>(null);
@@ -450,7 +461,8 @@
           <ScrollArea class="h-full">
             <QueuePanel
               {queue}
-              parallel={settings.parallelQueue}
+              {settings}
+              {now}
               {appsById}
               onstart={() =>
                 void attempt(async () => {

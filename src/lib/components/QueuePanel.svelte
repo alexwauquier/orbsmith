@@ -9,12 +9,13 @@
   import PlayIcon from "@lucide/svelte/icons/play";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import XIcon from "@lucide/svelte/icons/x";
-  import type { AppSummary, QueueItem, QueueState } from "$lib/api";
+  import type { AppSummary, QueueItem, QueueState, Settings } from "$lib/api";
   import { formatCountdown, formatDuration } from "$lib/time";
 
   let {
     queue,
-    parallel,
+    settings,
+    now,
     appsById,
     onstart,
     onpause,
@@ -23,7 +24,9 @@
     onmove
   }: {
     queue: QueueState;
-    parallel: boolean;
+    settings: Settings;
+    /** The current time, in milliseconds, for the countdown between games. */
+    now: number;
     appsById: Map<string, AppSummary>;
     onstart: () => void;
     onpause: () => void;
@@ -35,6 +38,18 @@
   } = $props();
 
   const empty = $derived(queue.active.length === 0 && queue.queued.length === 0);
+  const pacing = $derived(
+    [
+      settings.parallelQueue ? "All at once" : "One after another",
+      !settings.parallelQueue && settings.queueGapSecs > 0
+        ? `${formatDuration(settings.queueGapSecs)} apart`
+        : null,
+      settings.varyQueueTimes ? "Varied" : null,
+      queue.paused ? "Paused" : null
+    ]
+      .filter(Boolean)
+      .join(" · ")
+  );
 </script>
 
 {#snippet row(entry: QueueItem, active: boolean, position: number)}
@@ -104,9 +119,7 @@
     </p>
   {:else}
     <div class="flex items-center gap-2">
-      <p class="text-xs text-muted-foreground">
-        {parallel ? "All at once" : "One after another"}{queue.paused ? " · Paused" : ""}
-      </p>
+      <p class="text-xs text-muted-foreground">{pacing}</p>
       <Button
         variant="ghost"
         size="icon-sm"
@@ -129,6 +142,11 @@
         </Button>
       {/if}
     </div>
+    {#if queue.running && queue.nextStartAt !== null}
+      <p class="text-sm text-muted-foreground tabular-nums" role="status">
+        Next game in {formatCountdown(queue.nextStartAt - now)}
+      </p>
+    {/if}
     <div class="flex flex-col gap-2">
       {#each queue.active as item (item.appId)}
         {@render row(item, true, 0)}
