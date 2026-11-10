@@ -41,7 +41,7 @@ On GNOME, the tray icon needs the AppIndicator extension, which Ubuntu ships by 
 
 ### Verifying a download
 
-Releases are not code-signed, but every file on the Releases page comes with a build provenance attestation: a signed record, kept by GitHub, of the workflow run and the commit that built it. With the [GitHub CLI](https://cli.github.com), check a downloaded file with:
+Releases are not code-signed, but every file on the Releases page comes with a build provenance attestation: a signed record, kept by GitHub, of the workflow run and the commit that built it. With the [GitHub CLI](https://cli.github.com) 2.49 or later, check a downloaded file with:
 
 ```sh
 gh attestation verify Orbsmith_<version>_x64-setup.exe -R alexwauquier/orbsmith
