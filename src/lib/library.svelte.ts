@@ -1,28 +1,45 @@
+import { getLibrary, setLibrary } from "$lib/api";
 import {
   addRecent,
-  parseLibrary,
+  initialLibrary,
   rememberRun,
   toggleFavorite,
   type LastRun,
   type Library
 } from "$lib/library";
 
-const STORAGE_KEY = "orbsmith.library";
+/** Where versions up to 1.0.0 kept the library. */
+const LEGACY_STORAGE_KEY = "orbsmith.library";
 
 /**
- * Favorites, recently started apps and how each was last started, kept in the
- * webview's local storage, which lives in the app data dir.
+ * Favorites, recently started apps and how each was last started, saved by
+ * the backend as `library.json` in the app data dir. Changes made before
+ * `load` finishes are ignored, since loading would replace them.
  */
 export class LibraryStore {
   favorites = $state<string[]>([]);
   recent = $state<string[]>([]);
   lastRuns = $state<Record<string, LastRun>>({});
 
-  constructor() {
-    const stored = parseLibrary(read());
-    this.favorites = stored.favorites;
-    this.recent = stored.recent;
-    this.lastRuns = stored.lastRuns;
+  #loaded = false;
+  /** Saves run one after another, so an older one never lands last. */
+  #saving: Promise<boolean> = Promise.resolve(true);
+
+  /**
+   * Reads the saved library. The first time, it moves over what local storage
+   * held, and clears it once saved. A corrupt file is reported, and replaced
+   * on the next change.
+   */
+  async load() {
+    try {
+      const { library, migrate } = initialLibrary(await getLibrary(), readLegacy());
+      this.favorites = library.favorites;
+      this.recent = library.recent;
+      this.lastRuns = library.lastRuns;
+      if (migrate && (await this.save())) clearLegacy();
+    } finally {
+      this.#loaded = true;
+    }
   }
 
   lastRun(id: string): LastRun | undefined {
@@ -31,6 +48,7 @@ export class LibraryStore {
 
   /** Marks `id` as used and remembers how it was started. */
   markStarted(id: string, run: LastRun) {
+    if (!this.#loaded) return;
     this.lastRuns = rememberRun(this.lastRuns, id, run);
     this.markUsed(id);
   }
@@ -40,38 +58,56 @@ export class LibraryStore {
   }
 
   toggleFavorite(id: string) {
+    if (!this.#loaded) return;
     this.favorites = toggleFavorite(this.favorites, id);
-    this.save();
+    void this.save();
   }
 
   clearRecent() {
+    if (!this.#loaded) return;
     this.recent = [];
-    this.save();
+    void this.save();
   }
 
   markUsed(id: string) {
+    if (!this.#loaded) return;
     this.recent = addRecent(this.recent, id);
-    this.save();
+    void this.save();
   }
 
-  private save() {
-    const library: Library = {
+  /** Resolves to whether the save succeeded. */
+  private save(): Promise<boolean> {
+    const library: Library = $state.snapshot({
       favorites: this.favorites,
       recent: this.recent,
       lastRuns: this.lastRuns
-    };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
-    } catch {
-      // Storage can be unavailable; the lists then last for this session only.
-    }
+    });
+    this.#saving = this.#saving.then(() =>
+      setLibrary(library).then(
+        () => true,
+        (err: unknown) => {
+          // The lists then last for this session only.
+          console.warn("failed to save the library:", err);
+          return false;
+        }
+      )
+    );
+    return this.#saving;
   }
 }
 
-function read(): string | null {
+function readLegacy(): string | null {
   try {
-    return localStorage.getItem(STORAGE_KEY);
+    return localStorage.getItem(LEGACY_STORAGE_KEY);
   } catch {
     return null;
+  }
+}
+
+function clearLegacy() {
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    // Harmless: the saved library takes precedence from now on.
   }
 }

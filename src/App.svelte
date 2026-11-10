@@ -222,6 +222,7 @@
       loadApps(false),
       reloadSimulations(),
       reloadQueue(),
+      attempt(() => library.load()),
       attempt(async () => {
         settings = await getSettings();
       })

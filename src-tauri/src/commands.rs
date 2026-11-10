@@ -2,7 +2,9 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use orbsmith_core::simulation::MAX_DURATION;
-use orbsmith_core::{AppSummary, Catalog, Os, QueueItem, QueueState, Settings, SimulationInfo};
+use orbsmith_core::{
+    AppSummary, Catalog, Library, Os, QueueItem, QueueState, Settings, SimulationInfo,
+};
 use serde::{Serialize, Serializer};
 use tauri::{AppHandle, State};
 
@@ -105,6 +107,20 @@ pub fn set_simulation_timer(
         .simulations()
         .set_timer(&app_id, duration_secs.map(Duration::from_secs))?;
     Ok(info)
+}
+
+/// The saved library, or `None` before the first save, when the frontend
+/// moves over what it kept in local storage.
+#[tauri::command]
+pub fn get_library(state: State<'_, AppState>) -> CommandResult<Option<Library>> {
+    Ok(Library::load(&state.layout.library_file())?)
+}
+
+// Synchronous, so saves run one at a time, in order, on the main thread.
+#[tauri::command]
+pub fn set_library(state: State<'_, AppState>, library: Library) -> CommandResult<()> {
+    library.sanitized().save(&state.layout.library_file())?;
+    Ok(())
 }
 
 #[tauri::command]

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Favorite and recent games, and the duration and executable last used for each game, are saved to `library.json` in the data folder instead of the window's local storage, which Windows or a WebView2 reset could wipe. They are moved over on first launch.
+
 ### Fixed
 
 - When the computer went to sleep, game timers and the wait between queued games kept counting, so a game could stop on wake without having run for its whole duration. Time spent asleep is now added back to them.

@@ -1,4 +1,7 @@
-/** How an app was last started, to start it the same way next time. */
+/**
+ * How an app was last started, to start it the same way next time. Mirrors
+ * `orbsmith_core::library::LastRun`.
+ */
 export interface LastRun {
   /** The auto-stop duration, when one was set. */
   minutes?: number;
@@ -6,7 +9,10 @@ export interface LastRun {
   executable?: string;
 }
 
-/** The user's favorite and recently started apps, as app IDs, newest first. */
+/**
+ * The user's favorite and recently started apps, as app IDs, newest first.
+ * Mirrors `orbsmith_core::Library`.
+ */
 export interface Library {
   favorites: string[];
   recent: string[];
@@ -14,7 +20,9 @@ export interface Library {
   lastRuns: Record<string, LastRun>;
 }
 
+/** Mirrors `orbsmith_core::library::RECENT_LIMIT`. */
 export const RECENT_LIMIT = 8;
+/** Mirrors `orbsmith_core::library::LAST_RUNS_LIMIT`. */
 export const LAST_RUNS_LIMIT = 100;
 
 export function emptyLibrary(): Library {
@@ -90,6 +98,20 @@ function parseLastRuns(field: unknown): Record<string, LastRun> {
 
 function stringIds(field: unknown): string[] {
   return Array.isArray(field) ? field.filter((id): id is string => typeof id === "string") : [];
+}
+
+/**
+ * Picks the library to start with: the saved one, or else what versions up to
+ * 1.0.0 kept in local storage (`legacy`), which then has to be saved
+ * (`migrate`) before local storage is cleared.
+ */
+export function initialLibrary(
+  saved: Library | null,
+  legacy: string | null
+): { library: Library; migrate: boolean } {
+  if (saved !== null) return { library: saved, migrate: false };
+  if (legacy !== null) return { library: parseLibrary(legacy), migrate: true };
+  return { library: emptyLibrary(), migrate: false };
 }
 
 /** Resolves IDs to apps, in order, skipping those no longer in the catalog. */

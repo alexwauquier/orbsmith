@@ -22,6 +22,11 @@ impl Layout {
         self.data_dir.join("detectable-apps.json")
     }
 
+    /// Favorite and recent games, and how each was last started.
+    pub fn library_file(&self) -> PathBuf {
+        self.data_dir.join("library.json")
+    }
+
     /// The queue, kept across restarts.
     pub fn queue_file(&self) -> PathBuf {
         self.data_dir.join("queue.json")

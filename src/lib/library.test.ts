@@ -4,6 +4,7 @@ import {
   RECENT_LIMIT,
   addRecent,
   emptyLibrary,
+  initialLibrary,
   parseLibrary,
   rememberRun,
   resolveApps,
@@ -102,5 +103,27 @@ describe("parseLibrary lastRuns", () => {
     expect(Object.keys(parseLibrary(JSON.stringify({ lastRuns })).lastRuns)).toHaveLength(
       LAST_RUNS_LIMIT
     );
+  });
+});
+
+describe("initialLibrary", () => {
+  const saved = { favorites: ["1"], recent: ["2"], lastRuns: { "1": { minutes: 15 } } };
+
+  it("uses the saved library over local storage", () => {
+    expect(initialLibrary(saved, '{"favorites":["9"]}')).toEqual({
+      library: saved,
+      migrate: false
+    });
+  });
+
+  it("moves over local storage when nothing was saved yet", () => {
+    expect(initialLibrary(null, '{"favorites":["9","9"],"recent":["8"]}')).toEqual({
+      library: { favorites: ["9"], recent: ["8"], lastRuns: {} },
+      migrate: true
+    });
+  });
+
+  it("starts empty with neither", () => {
+    expect(initialLibrary(null, null)).toEqual({ library: emptyLibrary(), migrate: false });
   });
 });

@@ -104,6 +104,8 @@ pub fn run() -> tauri::Result<()> {
             commands::start_simulation,
             commands::stop_simulation,
             commands::set_simulation_timer,
+            commands::get_library,
+            commands::set_library,
             commands::get_settings,
             commands::set_settings,
             commands::list_queue,

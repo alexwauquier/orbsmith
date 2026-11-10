@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Library } from "$lib/library";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 /** An app that can be simulated on the current platform. */
@@ -129,6 +130,15 @@ export function iconUrl(app: Pick<AppSummary, "id" | "iconHash">, size = 64): st
   return app.iconHash
     ? `https://cdn.discordapp.com/app-icons/${app.id}/${app.iconHash}.png?size=${size}`
     : null;
+}
+
+/** The saved library, or `null` before the first save. */
+export function getLibrary(): Promise<Library | null> {
+  return invoke("get_library");
+}
+
+export function setLibrary(library: Library): Promise<void> {
+  return invoke("set_library", { library });
 }
 
 export function getSettings(): Promise<Settings> {
