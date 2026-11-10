@@ -463,6 +463,7 @@
             <QueuePanel
               {queue}
               {settings}
+              {simulations}
               {now}
               {appsById}
               onstart={() =>

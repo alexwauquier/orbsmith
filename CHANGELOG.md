@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The **Queue** tab shows how many games are left and when the queue should be done, or how long it takes before it is started. With **Vary times** on, it is an estimate.
+
 ### Changed
 
 - Favorite and recent games, and the duration and executable last used for each game, are saved to `library.json` in the data folder instead of the window's local storage, which Windows or a WebView2 reset could wipe. They are moved over on first launch.

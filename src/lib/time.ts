@@ -30,3 +30,14 @@ export function formatDuration(durationSecs: number): string {
   if (hours === 0) return `${minutes} min`;
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
+
+/** A time of day, `14:32` or `2:32 PM`, with the weekday when not today. */
+export function formatClock(timestamp: number, now: number, locale?: string): string {
+  const date = new Date(timestamp);
+  const today = date.toDateString() === new Date(now).toDateString();
+  return date.toLocaleString(locale, {
+    weekday: today ? undefined : "short",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}

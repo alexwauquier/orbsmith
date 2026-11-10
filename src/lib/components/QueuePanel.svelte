@@ -9,12 +9,14 @@
   import PlayIcon from "@lucide/svelte/icons/play";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import XIcon from "@lucide/svelte/icons/x";
-  import type { AppSummary, QueueItem, QueueState, Settings } from "$lib/api";
-  import { formatCountdown, formatDuration } from "$lib/time";
+  import type { AppSummary, QueueItem, QueueState, Settings, Simulation } from "$lib/api";
+  import { estimateQueue } from "$lib/queue-estimate";
+  import { formatClock, formatCountdown, formatDuration } from "$lib/time";
 
   let {
     queue,
     settings,
+    simulations,
     now,
     appsById,
     onstart,
@@ -25,6 +27,8 @@
   }: {
     queue: QueueState;
     settings: Settings;
+    /** Running simulations, for the timers of the active games. */
+    simulations: Simulation[];
     /** The current time, in milliseconds, for the countdown between games. */
     now: number;
     appsById: Map<string, AppSummary>;
@@ -50,6 +54,20 @@
       .filter(Boolean)
       .join(" · ")
   );
+
+  const estimate = $derived(estimateQueue(queue, settings, simulations, now));
+  const summary = $derived.by(() => {
+    if (!estimate) return null;
+    const count = queue.active.length + queue.queued.length;
+    const games = `${count} ${count === 1 ? "game" : "games"}`;
+    if (queue.running) {
+      const when = formatClock(estimate.endsAt, now);
+      return `${games} left · done ${estimate.approximate ? "around" : "at"} ${when}`;
+    }
+    // Whole minutes, rounded up: "0 min" would read as nothing left.
+    const minutes = Math.max(1, Math.ceil((estimate.endsAt - now) / 60_000));
+    return `${games} · takes ${estimate.approximate ? "about " : ""}${formatDuration(minutes * 60)}`;
+  });
 </script>
 
 {#snippet row(entry: QueueItem, active: boolean, position: number)}
@@ -142,6 +160,9 @@
         </Button>
       {/if}
     </div>
+    {#if summary}
+      <p class="text-sm text-muted-foreground tabular-nums">{summary}</p>
+    {/if}
     {#if queue.running && queue.nextStartAt !== null}
       <p class="text-sm text-muted-foreground tabular-nums" role="status">
         Next game in {formatCountdown(queue.nextStartAt - now)}

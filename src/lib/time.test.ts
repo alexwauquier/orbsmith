@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAgo, formatCountdown, formatDuration } from "$lib/time";
+import { formatAgo, formatClock, formatCountdown, formatDuration } from "$lib/time";
 
 describe("formatCountdown", () => {
   it("formats minutes and seconds", () => {
@@ -45,5 +45,17 @@ describe("formatDuration", () => {
   it("adds hours from an hour on", () => {
     expect(formatDuration(90 * 60)).toBe("1 h 30 min");
     expect(formatDuration(2 * 3600)).toBe("2 h");
+  });
+});
+
+describe("formatClock", () => {
+  const now = new Date(2026, 10, 10, 9, 0).getTime();
+
+  it("shows the time of day for today", () => {
+    expect(formatClock(new Date(2026, 10, 10, 14, 32).getTime(), now, "en-GB")).toBe("14:32");
+  });
+
+  it("adds the weekday for another day", () => {
+    expect(formatClock(new Date(2026, 10, 11, 1, 5).getTime(), now, "en-GB")).toBe("Wed 01:05");
   });
 });
