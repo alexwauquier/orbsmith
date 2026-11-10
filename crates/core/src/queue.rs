@@ -306,7 +306,8 @@ impl Queue {
             };
             self.next_start_at = now.checked_add(gap);
         }
-        let waiting = self.next_start_at.is_some_and(|at| now < at);
+        // Turning the wait off ends one in progress.
+        let waiting = !gap.is_zero() && self.next_start_at.is_some_and(|at| now < at);
 
         if pacing.parallel {
             let mut waiting = VecDeque::new();
@@ -875,6 +876,23 @@ mod tests {
         // No wait after the last game.
         let step = queue.next(&running(&[]), &pacing, at(300), &mut random);
         assert!(step.finished);
+        assert_eq!(queue.state().next_start_at, None);
+    }
+
+    #[test]
+    fn turning_the_wait_off_starts_the_next_game() {
+        let pacing = Pacing {
+            gap: Duration::from_secs(30),
+            ..Pacing::default()
+        };
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        let mut random = || 0.0;
+        queue.next(&running(&[]), &pacing, at(0), &mut random);
+        queue.next(&running(&[]), &pacing, at(10), &mut random);
+        assert!(queue.state().next_start_at.is_some());
+        let step = queue.next(&running(&[]), &Pacing::default(), at(11), &mut random);
+        assert_eq!(started(&step), ["b"]);
         assert_eq!(queue.state().next_start_at, None);
     }
 
