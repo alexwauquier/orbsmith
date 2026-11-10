@@ -36,6 +36,8 @@ pub enum Error {
     AlreadyQueued(String),
     #[error("the auto-stop timer cannot exceed 7 days")]
     TimerTooLong,
+    #[error("the wait between games cannot exceed 24 hours")]
+    GapTooLong,
     #[error("refusing to create {0}: it resolves outside the executables directory")]
     OutsideExecutablesDir(String),
     #[error("could not launch {path}: {source}")]

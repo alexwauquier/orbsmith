@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +25,40 @@ pub struct QueueItem {
     pub left: Option<Duration>,
     /// The executable to run, if not the app's default.
     pub executable: Option<String>,
+    /// Added to the duration when the game starts with varied times.
+    extra: Duration,
+}
+
+/// How the queue spaces and times its games.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Pacing {
+    /// Start every game at once instead of one after another.
+    pub parallel: bool,
+    /// Wait between one game's end and the next one's start, when they run
+    /// one after another.
+    pub gap: Duration,
+    /// Make each game run a little longer than its duration, never shorter,
+    /// and each wait a little shorter or longer, so the timing is less
+    /// regular.
+    pub vary: bool,
+}
+
+/// With varied times, a game runs up to this share of its duration longer.
+const MAX_EXTRA_SHARE: f64 = 0.10;
+/// With varied times, a wait lasts between `1 - GAP_SPREAD` and
+/// `1 + GAP_SPREAD` times the one set.
+const GAP_SPREAD: f64 = 0.5;
+/// Longest accepted wait between games.
+pub const MAX_GAP: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// A number in `[0, 1)` to vary times with. The standard library's hasher is
+/// seeded randomly for each `RandomState`, which is plenty here and avoids a
+/// dependency.
+pub fn random_fraction() -> f64 {
+    use std::hash::{BuildHasher, RandomState};
+    let bits = RandomState::new().hash_one(SystemTime::now());
+    // The top 53 bits fill an f64 mantissa exactly.
+    (bits >> 11) as f64 / (1u64 << 53) as f64
 }
 
 impl QueueItem {
@@ -35,6 +69,7 @@ impl QueueItem {
             duration,
             left: None,
             executable: None,
+            extra: Duration::ZERO,
         }
     }
 
@@ -45,9 +80,9 @@ impl QueueItem {
     }
 
     /// How long the game should run when started: the time left after a
-    /// pause, or the whole duration.
+    /// pause, or the whole duration plus any variation.
     pub fn run_time(&self) -> Duration {
-        self.left.unwrap_or(self.duration)
+        self.left.unwrap_or(self.duration + self.extra)
     }
 }
 
@@ -84,6 +119,9 @@ pub struct QueueState {
     pub active: Vec<QueueItemInfo>,
     /// Items waiting their turn, in order.
     pub queued: Vec<QueueItemInfo>,
+    /// When the next game starts, in milliseconds since the Unix epoch, while
+    /// the queue waits between two games.
+    pub next_start_at: Option<u64>,
 }
 
 /// What [`Queue::next`] decided.
@@ -104,6 +142,8 @@ pub struct Queue {
     active: Vec<QueueItem>,
     running: bool,
     paused: bool,
+    /// Set while waiting between two games.
+    next_start_at: Option<SystemTime>,
 }
 
 impl Queue {
@@ -132,6 +172,7 @@ impl Queue {
         self.queued.clear();
         self.running = false;
         self.paused = false;
+        self.next_start_at = None;
         std::mem::take(&mut self.active)
     }
 
@@ -192,10 +233,12 @@ impl Queue {
         Ok(())
     }
 
-    /// Starts the queue, or resumes it after a pause.
+    /// Starts the queue, or resumes it after a pause. The next game starts
+    /// right away, without waiting.
     pub fn start(&mut self) {
         self.running = self.remaining() > 0;
         self.paused = false;
+        self.next_start_at = None;
     }
 
     /// Pauses the queue. Active items go back to the front, in order, keeping
@@ -217,18 +260,27 @@ impl Queue {
         }
         self.running = false;
         self.paused = was_active && !self.queued.is_empty();
+        self.next_start_at = None;
         active
     }
 
     /// Forgets active items whose game no longer runs, since they are done or
-    /// were stopped, then picks the items to start. `running_apps` holds the
-    /// IDs of every running simulation. An item whose game already runs waits.
-    pub fn next(&mut self, running_apps: &HashSet<String>, parallel: bool) -> Step {
+    /// were stopped, then picks the items to start at `now`. `running_apps`
+    /// holds the IDs of every running simulation. An item whose game already
+    /// runs waits. `random` returns a number in `[0, 1)`, used to vary times.
+    pub fn next(
+        &mut self,
+        running_apps: &HashSet<String>,
+        pacing: &Pacing,
+        now: SystemTime,
+        random: &mut impl FnMut() -> f64,
+    ) -> Step {
         let before = self.active.len();
         self.active
             .retain(|item| running_apps.contains(&item.app_id));
+        let ended = self.active.len() != before;
         let mut step = Step {
-            changed: self.active.len() != before,
+            changed: ended,
             ..Step::default()
         };
         if !self.running {
@@ -240,7 +292,23 @@ impl Queue {
             return step;
         }
 
-        if parallel {
+        let gap = pacing.gap.min(MAX_GAP);
+        if !pacing.parallel
+            && ended
+            && self.active.is_empty()
+            && !self.queued.is_empty()
+            && !gap.is_zero()
+        {
+            let gap = if pacing.vary {
+                gap.mul_f64(1.0 - GAP_SPREAD + 2.0 * GAP_SPREAD * random())
+            } else {
+                gap
+            };
+            self.next_start_at = now.checked_add(gap);
+        }
+        let waiting = self.next_start_at.is_some_and(|at| now < at);
+
+        if pacing.parallel {
             let mut waiting = VecDeque::new();
             while let Some(item) = self.queued.pop_front() {
                 if running_apps.contains(&item.app_id) {
@@ -251,6 +319,7 @@ impl Queue {
             }
             self.queued = waiting;
         } else if self.active.is_empty()
+            && !waiting
             && self
                 .queued
                 .front()
@@ -258,6 +327,14 @@ impl Queue {
             && let Some(item) = self.queued.pop_front()
         {
             step.start.push(item);
+        }
+        if !step.start.is_empty() {
+            self.next_start_at = None;
+        }
+        if pacing.vary {
+            for item in step.start.iter_mut().filter(|item| item.left.is_none()) {
+                item.extra = item.duration.mul_f64(MAX_EXTRA_SHARE * random());
+            }
         }
 
         self.active.extend(step.start.iter().cloned());
@@ -293,6 +370,7 @@ impl Queue {
             paused: self.paused,
             active: self.active.iter().map(QueueItemInfo::from).collect(),
             queued: self.queued.iter().map(QueueItemInfo::from).collect(),
+            next_start_at: self.next_start_at.map(crate::catalog::unix_ms),
         }
     }
 
@@ -355,6 +433,8 @@ impl From<SavedItem> for QueueItem {
 
 #[cfg(test)]
 mod tests {
+    use std::time::UNIX_EPOCH;
+
     use super::*;
 
     fn item(id: &str) -> QueueItem {
@@ -380,6 +460,14 @@ mod tests {
         ids.iter().map(|id| (*id).to_owned()).collect()
     }
 
+    /// Pacing without waits or variation.
+    fn plain(parallel: bool) -> Pacing {
+        Pacing {
+            parallel,
+            ..Pacing::default()
+        }
+    }
+
     fn started(step: &Step) -> Vec<&str> {
         step.start.iter().map(|item| item.app_id.as_str()).collect()
     }
@@ -389,14 +477,17 @@ mod tests {
         let mut queue = queue(&["a"]);
         assert!(matches!(queue.add(item("a")), Err(Error::AlreadyQueued(_))));
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert!(queue.add(item("a")).is_err(), "active items count too");
     }
 
     #[test]
     fn does_nothing_until_started() {
         let mut queue = queue(&["a"]);
-        assert_eq!(queue.next(&running(&[]), false), Step::default());
+        assert_eq!(
+            queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0),
+            Step::default()
+        );
         assert!(!queue.is_running());
     }
 
@@ -405,15 +496,21 @@ mod tests {
         let mut queue = queue(&["a", "b"]);
         queue.start();
 
-        let step = queue.next(&running(&[]), false);
+        let step = queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert_eq!(started(&step), ["a"]);
         assert!(step.changed);
-        assert_eq!(queue.next(&running(&["a"]), false), Step::default());
+        assert_eq!(
+            queue.next(&running(&["a"]), &plain(false), UNIX_EPOCH, &mut || 0.0),
+            Step::default()
+        );
 
         // "a" ended: "b" starts.
-        assert_eq!(started(&queue.next(&running(&[]), false)), ["b"]);
+        assert_eq!(
+            started(&queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0)),
+            ["b"]
+        );
 
-        let step = queue.next(&running(&[]), false);
+        let step = queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert!(step.start.is_empty());
         assert!(step.finished && step.changed);
         assert!(!queue.is_running());
@@ -424,13 +521,20 @@ mod tests {
     fn runs_items_in_parallel() {
         let mut queue = queue(&["a", "b", "c"]);
         queue.start();
-        assert_eq!(started(&queue.next(&running(&[]), true)), ["a", "b", "c"]);
+        assert_eq!(
+            started(&queue.next(&running(&[]), &plain(true), UNIX_EPOCH, &mut || 0.0)),
+            ["a", "b", "c"]
+        );
         assert_eq!(queue.remaining(), 3);
 
-        let step = queue.next(&running(&["b"]), true);
+        let step = queue.next(&running(&["b"]), &plain(true), UNIX_EPOCH, &mut || 0.0);
         assert!(step.changed && !step.finished);
         assert_eq!(queue.remaining(), 1);
-        assert!(queue.next(&running(&[]), true).finished);
+        assert!(
+            queue
+                .next(&running(&[]), &plain(true), UNIX_EPOCH, &mut || 0.0)
+                .finished
+        );
     }
 
     #[test]
@@ -438,9 +542,17 @@ mod tests {
         let mut queue = queue(&["a", "b"]);
         queue.start();
         // Sequential: "a" waits, and so does everything behind it.
-        assert!(queue.next(&running(&["a"]), false).start.is_empty());
+        assert!(
+            queue
+                .next(&running(&["a"]), &plain(false), UNIX_EPOCH, &mut || 0.0)
+                .start
+                .is_empty()
+        );
         // Parallel: only "a" waits.
-        assert_eq!(started(&queue.next(&running(&["a"]), true)), ["b"]);
+        assert_eq!(
+            started(&queue.next(&running(&["a"]), &plain(true), UNIX_EPOCH, &mut || 0.0)),
+            ["b"]
+        );
         assert_eq!(queue.state().queued[0].app_id, "a");
     }
 
@@ -448,16 +560,25 @@ mod tests {
     fn a_failed_start_moves_on_to_the_next_item() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        assert_eq!(started(&queue.next(&running(&[]), false)), ["a"]);
+        assert_eq!(
+            started(&queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0)),
+            ["a"]
+        );
         queue.failed("a");
-        assert_eq!(started(&queue.next(&running(&[]), false)), ["b"]);
+        assert_eq!(
+            started(&queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0)),
+            ["b"]
+        );
     }
 
     #[test]
     fn pausing_keeps_the_time_left_and_resumes_with_it() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        assert_eq!(started(&queue.next(&running(&[]), false)), ["a"]);
+        assert_eq!(
+            started(&queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0)),
+            ["a"]
+        );
 
         let stopped = queue.pause(&left(&[("a", 42)]));
         assert_eq!(stopped.len(), 1, "a's game must be stopped");
@@ -467,13 +588,16 @@ mod tests {
         assert_eq!(state.queued[0].app_id, "a");
         assert_eq!(state.queued[0].left_secs, Some(42));
         assert!(
-            queue.next(&running(&[]), false).start.is_empty(),
+            queue
+                .next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0)
+                .start
+                .is_empty(),
             "nothing starts"
         );
 
         queue.start();
         assert!(!queue.is_paused());
-        let step = queue.next(&running(&[]), false);
+        let step = queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert_eq!(started(&step), ["a"]);
         assert_eq!(step.start[0].run_time(), Duration::from_secs(42));
     }
@@ -482,7 +606,7 @@ mod tests {
     fn pausing_in_parallel_keeps_every_game_in_order() {
         let mut queue = queue(&["a", "b", "c"]);
         queue.start();
-        queue.next(&running(&[]), true);
+        queue.next(&running(&[]), &plain(true), UNIX_EPOCH, &mut || 0.0);
         queue.add(item("d")).unwrap();
 
         let stopped = queue.pause(&left(&[("a", 10), ("b", 20), ("c", 30)]));
@@ -497,7 +621,7 @@ mod tests {
     fn an_item_with_no_time_left_is_done_when_paused() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         queue.pause(&left(&[("a", 0)]));
         let order: Vec<_> = queue.state().queued.into_iter().map(|q| q.app_id).collect();
         assert_eq!(order, ["b"]);
@@ -507,11 +631,11 @@ mod tests {
     fn a_pause_with_nothing_left_clears_itself() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         queue.pause(&left(&[("a", 5)]));
         queue.remove("a");
         queue.remove("b");
-        let step = queue.next(&running(&[]), false);
+        let step = queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert!(step.changed && !step.finished);
         assert!(!queue.is_paused());
     }
@@ -530,7 +654,7 @@ mod tests {
         let file = dir.path().join("queue.json");
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         queue.pause(&left(&[("a", 42)]));
         queue.save(&file).unwrap();
         assert!(!file.with_extension("json.tmp").exists());
@@ -539,7 +663,7 @@ mod tests {
         assert!(restored.is_paused() && !restored.is_running());
         assert_eq!(restored.state().queued, queue.state().queued);
         restored.start();
-        let step = restored.next(&running(&[]), false);
+        let step = restored.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert_eq!(step.start[0].run_time(), Duration::from_secs(42));
     }
 
@@ -549,7 +673,7 @@ mod tests {
         let file = dir.path().join("queue.json");
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         // Saved while "a" was running, then Orbsmith died.
         queue.save(&file).unwrap();
 
@@ -577,7 +701,7 @@ mod tests {
 
         let mut restored = Queue::load(&file).unwrap();
         restored.start();
-        let step = restored.next(&running(&[]), true);
+        let step = restored.next(&running(&[]), &plain(true), UNIX_EPOCH, &mut || 0.0);
         assert_eq!(
             step.start[0].executable.as_deref(),
             Some("league of legends.exe")
@@ -643,7 +767,7 @@ mod tests {
     fn active_items_do_not_move() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert!(!queue.move_queued("a", false));
     }
 
@@ -651,12 +775,17 @@ mod tests {
     fn clearing_empties_and_resets_the_queue() {
         let mut queue = queue(&["a", "b", "c"]);
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         let stopped = queue.clear();
         assert_eq!(stopped.len(), 1, "a's game must be stopped");
         assert_eq!(queue.remaining(), 0);
         assert!(!queue.is_running() && !queue.is_paused());
-        assert!(queue.next(&running(&[]), false).start.is_empty());
+        assert!(
+            queue
+                .next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0)
+                .start
+                .is_empty()
+        );
         queue.add(item("a")).unwrap();
     }
 
@@ -664,7 +793,7 @@ mod tests {
     fn removes_only_queued_items() {
         let mut queue = queue(&["a", "b"]);
         queue.start();
-        queue.next(&running(&[]), false);
+        queue.next(&running(&[]), &plain(false), UNIX_EPOCH, &mut || 0.0);
         assert!(queue.remove("a").is_none(), "a is active");
         assert_eq!(queue.remove("b").map(|q| q.app_id), Some("b".to_owned()));
         assert!(queue.remove("b").is_none());
@@ -692,7 +821,132 @@ mod tests {
                     duration_secs: 60,
                     left_secs: None,
                 }],
+                next_start_at: None,
             }
         );
+    }
+
+    fn at(secs: u64) -> SystemTime {
+        UNIX_EPOCH + Duration::from_secs(secs)
+    }
+
+    #[test]
+    fn waits_between_games_one_after_another() {
+        let pacing = Pacing {
+            gap: Duration::from_secs(30),
+            ..Pacing::default()
+        };
+        let mut queue = queue(&["a", "b", "c"]);
+        queue.start();
+        let mut random = || 0.0;
+        assert_eq!(
+            started(&queue.next(&running(&[]), &pacing, at(0), &mut random)),
+            ["a"],
+            "the first game starts right away"
+        );
+
+        // "a" ends at 100 s: "b" waits until 130 s.
+        let step = queue.next(&running(&[]), &pacing, at(100), &mut random);
+        assert!(step.start.is_empty() && step.changed && !step.finished);
+        assert_eq!(queue.state().next_start_at, Some(130_000));
+        assert!(
+            queue
+                .next(&running(&[]), &pacing, at(129), &mut random)
+                .start
+                .is_empty()
+        );
+        assert_eq!(
+            started(&queue.next(&running(&[]), &pacing, at(130), &mut random)),
+            ["b"]
+        );
+        assert_eq!(queue.state().next_start_at, None);
+
+        // Pausing during a wait and resuming starts the next game at once.
+        queue.next(&running(&[]), &pacing, at(200), &mut random);
+        assert!(queue.state().next_start_at.is_some());
+        queue.pause(&left(&[]));
+        assert_eq!(queue.state().next_start_at, None);
+        queue.start();
+        assert_eq!(
+            started(&queue.next(&running(&[]), &pacing, at(201), &mut random)),
+            ["c"]
+        );
+
+        // No wait after the last game.
+        let step = queue.next(&running(&[]), &pacing, at(300), &mut random);
+        assert!(step.finished);
+        assert_eq!(queue.state().next_start_at, None);
+    }
+
+    #[test]
+    fn never_waits_in_parallel() {
+        let pacing = Pacing {
+            parallel: true,
+            gap: Duration::from_secs(30),
+            ..Pacing::default()
+        };
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        let mut random = || 0.0;
+        assert_eq!(
+            started(&queue.next(&running(&[]), &pacing, at(0), &mut random)),
+            ["a", "b"]
+        );
+        queue.add(item("c")).unwrap();
+        assert_eq!(
+            started(&queue.next(&running(&["b"]), &pacing, at(10), &mut random)),
+            ["c"]
+        );
+    }
+
+    #[test]
+    fn varied_times_only_lengthen_games_and_spread_waits() {
+        let pacing = Pacing {
+            gap: Duration::from_secs(100),
+            vary: true,
+            ..Pacing::default()
+        };
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+
+        // The largest draw: 10 % longer, and a wait 1.5 times as long.
+        let mut high = || 0.999_999;
+        let step = queue.next(&running(&[]), &pacing, at(0), &mut high);
+        let run_time = step.start[0].run_time();
+        assert!(run_time > Duration::from_secs(65) && run_time <= Duration::from_secs(66));
+        queue.next(&running(&[]), &pacing, at(100), &mut high);
+        let next = queue.state().next_start_at.unwrap();
+        assert!((249_000..=250_000).contains(&next), "{next}");
+
+        // The smallest draw: the full duration, and half the wait.
+        let mut other = self::queue(&["a", "b"]);
+        other.start();
+        let mut low = || 0.0;
+        let step = other.next(&running(&[]), &pacing, at(0), &mut low);
+        assert_eq!(step.start[0].run_time(), Duration::from_secs(60));
+        other.next(&running(&[]), &pacing, at(100), &mut low);
+        assert_eq!(other.state().next_start_at, Some(150_000));
+    }
+
+    #[test]
+    fn random_fractions_stay_in_range_and_vary() {
+        let draws: Vec<f64> = (0..100).map(|_| random_fraction()).collect();
+        assert!(draws.iter().all(|draw| (0.0..1.0).contains(draw)));
+        assert!(draws.windows(2).any(|pair| pair[0] != pair[1]));
+    }
+
+    #[test]
+    fn a_resumed_game_runs_for_its_time_left_only() {
+        let pacing = Pacing {
+            vary: true,
+            ..Pacing::default()
+        };
+        let mut queue = queue(&["a"]);
+        queue.start();
+        queue.next(&running(&[]), &pacing, at(0), &mut || 0.5);
+        queue.pause(&left(&[("a", 20)]));
+        queue.start();
+        let step = queue.next(&running(&[]), &pacing, at(10), &mut || 0.999);
+        assert_eq!(step.start[0].run_time(), Duration::from_secs(20));
     }
 }

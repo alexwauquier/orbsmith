@@ -1,10 +1,12 @@
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
+use crate::queue::{MAX_GAP, Pacing};
 
 /// User preferences, stored as JSON in the app data dir. Missing fields take
 /// their default, so older files keep loading as settings are added.
@@ -15,6 +17,12 @@ pub struct Settings {
     pub parallel_queue: bool,
     /// Look for a new release at startup.
     pub check_for_updates: bool,
+    /// Wait between two games of the queue when they run one after another,
+    /// in seconds.
+    pub queue_gap_secs: u64,
+    /// Make queued games run a little longer than their duration, and the
+    /// waits a little shorter or longer.
+    pub vary_queue_times: bool,
 }
 
 impl Default for Settings {
@@ -22,11 +30,30 @@ impl Default for Settings {
         Self {
             parallel_queue: false,
             check_for_updates: true,
+            queue_gap_secs: 0,
+            vary_queue_times: false,
         }
     }
 }
 
 impl Settings {
+    /// How the queue paces its games.
+    pub fn pacing(&self) -> Pacing {
+        Pacing {
+            parallel: self.parallel_queue,
+            gap: Duration::from_secs(self.queue_gap_secs),
+            vary: self.vary_queue_times,
+        }
+    }
+
+    /// Rejects values the UI does not offer.
+    pub fn validate(&self) -> Result<(), Error> {
+        if Duration::from_secs(self.queue_gap_secs) > MAX_GAP {
+            return Err(Error::GapTooLong);
+        }
+        Ok(())
+    }
+
     /// The saved settings, or the defaults if none were saved yet.
     pub fn load(file: &Path) -> Result<Self, Error> {
         match fs::read(file) {
@@ -70,6 +97,8 @@ mod tests {
         let settings = Settings {
             parallel_queue: true,
             check_for_updates: false,
+            queue_gap_secs: 300,
+            vary_queue_times: true,
         };
         settings.save(&file).unwrap();
         assert_eq!(Settings::load(&file).unwrap(), settings);
@@ -88,6 +117,18 @@ mod tests {
         let settings = Settings::load(&file).unwrap();
         assert!(settings.parallel_queue);
         assert!(settings.check_for_updates);
+    }
+
+    #[test]
+    fn caps_the_wait_between_games() {
+        let mut settings = Settings {
+            queue_gap_secs: 24 * 60 * 60,
+            ..Settings::default()
+        };
+        assert!(settings.validate().is_ok());
+        assert_eq!(settings.pacing().gap, MAX_GAP);
+        settings.queue_gap_secs += 1;
+        assert!(matches!(settings.validate(), Err(Error::GapTooLong)));
     }
 
     #[test]
