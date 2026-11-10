@@ -205,3 +205,11 @@ export function pauseQueue(): Promise<QueueState> {
 export function onQueueChanged(handler: () => void): Promise<UnlistenFn> {
   return listen("queue-changed", () => handler());
 }
+
+/**
+ * Called with the app ID of a favorite started from the tray. Mirrors
+ * `TRAY_STARTED_EVENT` in `src-tauri/src/tray.rs`.
+ */
+export function onTrayStarted(handler: (appId: string) => void): Promise<UnlistenFn> {
+  return listen<string>("tray-started", (event) => handler(event.payload));
+}

@@ -46,8 +46,14 @@ pub struct AppList {
 /// `refresh` is set, there is no usable cache yet, or it is more than a day
 /// old and a new list can be downloaded.
 #[tauri::command]
-pub async fn get_apps(state: State<'_, AppState>, refresh: bool) -> CommandResult<AppList> {
+pub async fn get_apps(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+    refresh: bool,
+) -> CommandResult<AppList> {
     let catalog = catalog(&state, refresh).await?;
+    // The tray lists favorites once the list is loaded.
+    crate::tray::refresh(&handle);
     Ok(AppList {
         apps: catalog.summaries(Os::CURRENT),
         fetched_at: catalog.fetched_at_ms(),
@@ -118,8 +124,13 @@ pub fn get_library(state: State<'_, AppState>) -> CommandResult<Option<Library>>
 
 // Synchronous, so saves run one at a time, in order, on the main thread.
 #[tauri::command]
-pub fn set_library(state: State<'_, AppState>, library: Library) -> CommandResult<()> {
+pub fn set_library(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+    library: Library,
+) -> CommandResult<()> {
     library.sanitized().save(&state.layout.library_file())?;
+    crate::tray::refresh(&handle);
     Ok(())
 }
 

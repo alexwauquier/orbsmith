@@ -37,6 +37,7 @@
     listQueue,
     moveInQueue,
     onQueueChanged,
+    onTrayStarted,
     onSimulationsChanged,
     removeFromQueue,
     setSettings,
@@ -238,7 +239,8 @@
     const tick = setInterval(() => (now = Date.now()), 1000);
     const listeners = [
       onSimulationsChanged(() => void reloadSimulations()),
-      onQueueChanged(() => void reloadQueue())
+      onQueueChanged(() => void reloadQueue()),
+      onTrayStarted((appId) => library.markUsed(appId))
     ];
     return () => {
       clearInterval(tick);

@@ -21,6 +21,10 @@ pub fn queue_item_failed(app: &AppHandle, app_name: &str, reason: &str) {
     );
 }
 
+pub fn start_failed(app: &AppHandle, app_name: &str, reason: &str) {
+    show(app, &format!("Could not start {app_name}"), reason);
+}
+
 pub fn queue_finished(app: &AppHandle) {
     show(
         app,

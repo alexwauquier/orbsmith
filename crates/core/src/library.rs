@@ -6,11 +6,14 @@ use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
+use std::time::Duration;
 
 use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::catalog::Catalog;
 use crate::error::Error;
+use crate::os::Os;
 
 /// Recent games kept.
 pub const RECENT_LIMIT: usize = 8;
@@ -89,6 +92,49 @@ impl Library {
     }
 }
 
+/// A favorite game, ready to start the way it was last started.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Launch {
+    pub app_id: String,
+    pub app_name: String,
+    /// The last auto-stop duration, or `None` to run until stopped.
+    pub duration: Option<Duration>,
+    /// The last executable chosen, if it can still be simulated.
+    pub executable: Option<String>,
+}
+
+impl Library {
+    /// The first `limit` favorites that can be simulated on `os`, in order,
+    /// each with how it was last started.
+    pub fn favorite_launches(&self, catalog: &Catalog, os: Os, limit: usize) -> Vec<Launch> {
+        self.favorites
+            .iter()
+            .filter_map(|id| {
+                let app = catalog.get(id)?;
+                app.target(os)?;
+                let run = self
+                    .last_runs
+                    .iter()
+                    .rev()
+                    .find(|(other, _)| other == id)
+                    .map(|(_, run)| run);
+                Some(Launch {
+                    app_id: id.clone(),
+                    app_name: app.name.clone(),
+                    duration: run
+                        .and_then(|run| run.minutes)
+                        .filter(|minutes| *minutes >= 1.0 && minutes.fract() == 0.0)
+                        .map(|minutes| Duration::from_secs(minutes as u64 * 60)),
+                    executable: run
+                        .and_then(|run| run.executable.clone())
+                        .filter(|name| app.target_named(os, name).is_some()),
+                })
+            })
+            .take(limit)
+            .collect()
+    }
+}
+
 fn dedup_keep_first(ids: &mut Vec<String>) {
     let mut seen = std::collections::HashSet::new();
     ids.retain(|id| seen.insert(id.clone()));
@@ -140,6 +186,63 @@ mod tests {
             minutes,
             executable: None,
         }
+    }
+
+    #[test]
+    fn favorite_launches_use_the_last_run() {
+        let os = Os::CURRENT.api_name();
+        let json = format!(
+            r#"[
+                {{"id": "1", "name": "One", "executables": [
+                    {{"os": "{os}", "name": "one", "is_launcher": false}},
+                    {{"os": "{os}", "name": "alt/one", "is_launcher": false}}]}},
+                {{"id": "2", "name": "Two", "executables": [
+                    {{"os": "{os}", "name": "two", "is_launcher": false}}]}},
+                {{"id": "3", "name": "Elsewhere", "executables": [
+                    {{"os": "darwin", "name": "three", "is_launcher": false}}]}}
+            ]"#
+        );
+        let catalog = Catalog::from_json(json.as_bytes(), std::time::UNIX_EPOCH).unwrap();
+        let library = Library {
+            favorites: vec!["2".into(), "gone".into(), "3".into(), "1".into()],
+            recent: vec![],
+            last_runs: vec![
+                (
+                    "1".into(),
+                    LastRun {
+                        minutes: Some(15.0),
+                        executable: Some("alt/one".into()),
+                    },
+                ),
+                (
+                    "2".into(),
+                    LastRun {
+                        minutes: None,
+                        executable: Some("removed".into()),
+                    },
+                ),
+            ],
+        };
+
+        let launches = library.favorite_launches(&catalog, Os::CURRENT, 10);
+        assert_eq!(
+            launches,
+            [
+                Launch {
+                    app_id: "2".into(),
+                    app_name: "Two".into(),
+                    duration: None,
+                    executable: None,
+                },
+                Launch {
+                    app_id: "1".into(),
+                    app_name: "One".into(),
+                    duration: Some(Duration::from_secs(15 * 60)),
+                    executable: Some("alt/one".into()),
+                },
+            ]
+        );
+        assert_eq!(library.favorite_launches(&catalog, Os::CURRENT, 1).len(), 1);
     }
 
     #[test]
