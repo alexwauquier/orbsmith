@@ -241,6 +241,22 @@ impl Simulations {
         Ok(running.info.clone())
     }
 
+    /// Pushes every auto-stop timer back by `by`, along with the start time
+    /// shown for games without one, after time in which the games did not
+    /// run (see [`SuspendDetector`](crate::SuspendDetector)).
+    pub fn postpone(&mut self, by: Duration) {
+        let by_ms = u64::try_from(by.as_millis()).unwrap_or(u64::MAX);
+        for running in self.running.values_mut() {
+            if let Some(stop_at) = running.stop_at {
+                // Unrepresentable only centuries away: keep the old deadline.
+                running.stop_at = Some(stop_at.checked_add(by).unwrap_or(stop_at));
+                running.info.stop_at = running.stop_at.map(unix_ms);
+            } else {
+                running.info.started_at = running.info.started_at.saturating_add(by_ms);
+            }
+        }
+    }
+
     /// Running simulations, oldest first.
     pub fn list(&self) -> Vec<SimulationInfo> {
         let mut list: Vec<_> = self.running.values().map(|r| r.info.clone()).collect();
@@ -475,6 +491,36 @@ mod tests {
             sims.tick(SystemTime::now() + Duration::from_secs(3600))
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn postpone_pushes_timers_back() {
+        let (_dir, mut sims, app) = setup("Game");
+        let info = sims
+            .start(&app, Os::CURRENT, None, Some(Duration::from_secs(60)))
+            .unwrap();
+        sims.postpone(Duration::from_secs(600));
+
+        let moved = &sims.list()[0];
+        assert_eq!(moved.stop_at, info.stop_at.map(|at| at + 600_000));
+        assert_eq!(moved.started_at, info.started_at);
+        assert!(
+            sims.tick(SystemTime::now() + Duration::from_secs(61))
+                .is_empty()
+        );
+        assert_eq!(
+            sims.tick(SystemTime::now() + Duration::from_secs(661))[0].reason,
+            EndReason::Timer
+        );
+    }
+
+    #[test]
+    fn postpone_moves_the_start_of_untimed_games() {
+        let (_dir, mut sims, app) = setup("Game");
+        let info = sims.start(&app, Os::CURRENT, None, None).unwrap();
+        sims.postpone(Duration::from_secs(600));
+        assert_eq!(sims.list()[0].started_at, info.started_at + 600_000);
+        sims.stop("42").unwrap();
     }
 
     #[test]

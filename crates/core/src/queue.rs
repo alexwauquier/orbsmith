@@ -347,6 +347,14 @@ impl Queue {
         step
     }
 
+    /// Pushes a wait between two games back by `by`, after time in which
+    /// nothing ran (see [`SuspendDetector`](crate::SuspendDetector)).
+    pub fn postpone(&mut self, by: Duration) {
+        if let Some(at) = self.next_start_at {
+            self.next_start_at = Some(at.checked_add(by).unwrap_or(at));
+        }
+    }
+
     /// Drops an active item whose game could not be started.
     pub fn failed(&mut self, app_id: &str) {
         self.active.retain(|item| item.app_id != app_id);
@@ -829,6 +837,39 @@ mod tests {
 
     fn at(secs: u64) -> SystemTime {
         UNIX_EPOCH + Duration::from_secs(secs)
+    }
+
+    #[test]
+    fn postpone_pushes_a_wait_back() {
+        let pacing = Pacing {
+            gap: Duration::from_secs(30),
+            ..Pacing::default()
+        };
+        let mut queue = queue(&["a", "b"]);
+        queue.start();
+        let mut random = || 0.0;
+        queue.next(&running(&[]), &pacing, at(0), &mut random);
+        queue.next(&running(&[]), &pacing, at(100), &mut random);
+
+        queue.postpone(Duration::from_secs(600));
+        assert_eq!(queue.state().next_start_at, Some(730_000));
+        assert!(
+            queue
+                .next(&running(&[]), &pacing, at(729), &mut random)
+                .start
+                .is_empty()
+        );
+        assert_eq!(
+            started(&queue.next(&running(&[]), &pacing, at(730), &mut random)),
+            ["b"]
+        );
+    }
+
+    #[test]
+    fn postpone_without_a_wait_changes_nothing() {
+        let mut queue = queue(&["a"]);
+        queue.postpone(Duration::from_secs(600));
+        assert_eq!(queue.state().next_start_at, None);
     }
 
     #[test]

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- When the computer went to sleep, game timers and the wait between queued games kept counting, so a game could stop on wake without having run for its whole duration. Time spent asleep is now added back to them.
+
 ## [1.0.0] - 2026-11-10
 
 ### Added

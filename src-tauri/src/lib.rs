@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
-use orbsmith_core::{Layout, Os, Queue, Settings, cleanup};
+use orbsmith_core::{Layout, Os, Queue, Settings, SuspendDetector, cleanup};
 use tauri::utils::config::{AppDirectoriesOverride, AppDirectoryOverrides};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
@@ -170,16 +170,32 @@ pub(crate) fn queue_changed(app: &AppHandle) {
     }
 }
 
+/// How often timers are checked and the queue moves on.
+const WATCH_PERIOD: Duration = Duration::from_secs(1);
+
 /// Applies auto-stop timers, notices dummies that exited and moves the
-/// queue on, once per second.
+/// queue on, once per second. Time the system spent asleep is added to the
+/// timers first, since the games did not run meanwhile.
 async fn watch_simulations(app: AppHandle) {
-    let mut interval = tokio::time::interval(Duration::from_secs(1));
+    let mut interval = tokio::time::interval(WATCH_PERIOD);
+    // After a sleep, one late pass is enough; the default bursts them.
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let mut suspend = SuspendDetector::new(WATCH_PERIOD);
     loop {
         interval.tick().await;
-        let ended = app
-            .state::<AppState>()
-            .simulations()
-            .tick(SystemTime::now());
+        let now = SystemTime::now();
+        if let Some(missed) = suspend.missed(now) {
+            log::info!(
+                "the system slept or its clock jumped for {} s; timers pushed back",
+                missed.as_secs()
+            );
+            let state = app.state::<AppState>();
+            state.simulations().postpone(missed);
+            state.queue().postpone(missed);
+            simulations_changed(&app);
+            queue_changed(&app);
+        }
+        let ended = app.state::<AppState>().simulations().tick(now);
         if !ended.is_empty() {
             for end in &ended {
                 notify::simulation_ended(&app, end);
@@ -187,5 +203,6 @@ async fn watch_simulations(app: AppHandle) {
             simulations_changed(&app);
         }
         queue::advance(&app).await;
+        suspend.pass_ended(SystemTime::now());
     }
 }

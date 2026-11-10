@@ -11,6 +11,7 @@ pub mod os;
 pub mod queue;
 pub mod settings;
 pub mod simulation;
+pub mod suspend;
 
 pub use catalog::{AppSummary, Catalog, DetectableApp};
 pub use error::Error;
@@ -19,6 +20,7 @@ pub use os::Os;
 pub use queue::{Queue, QueueItem, QueueState};
 pub use settings::Settings;
 pub use simulation::{EndReason, Ended, SimulationInfo, Simulations};
+pub use suspend::SuspendDetector;
 
 #[cfg(test)]
 pub(crate) mod test_support;
