@@ -12,6 +12,7 @@
     running,
     queued,
     favorite,
+    highlighted = false,
     onstart,
     ontogglefavorite
   }: {
@@ -20,12 +21,20 @@
     /** Waiting in the queue; a running queued game shows as running. */
     queued: boolean;
     favorite: boolean;
+    /** Picked with the arrow keys from the search box: Enter starts it. */
+    highlighted?: boolean;
     onstart: () => void;
     ontogglefavorite: () => void;
   } = $props();
+
+  let element = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    if (highlighted) element?.scrollIntoView({ block: "nearest" });
+  });
 </script>
 
-<Item.Root size="sm">
+<Item.Root size="sm" bind:ref={element} class={highlighted ? "ring-1 ring-primary/60" : undefined}>
   <Item.Media variant="image">
     <AppIcon {app} class="size-full" />
   </Item.Media>

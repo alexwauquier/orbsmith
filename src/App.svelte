@@ -6,12 +6,14 @@
   import * as Item from "$lib/components/ui/item";
   import * as Tabs from "$lib/components/ui/tabs";
   import { Badge } from "$lib/components/ui/badge";
+  import { Kbd } from "$lib/components/ui/kbd";
   import { Button } from "$lib/components/ui/button";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { Separator } from "$lib/components/ui/separator";
   import { Skeleton } from "$lib/components/ui/skeleton";
   import { Spinner } from "$lib/components/ui/spinner";
   import AppRow from "$lib/components/AppRow.svelte";
+  import { moveHighlight, searchShortcut, windowShortcut } from "$lib/shortcuts";
   import QueuePanel from "$lib/components/QueuePanel.svelte";
   import RunningCard from "$lib/components/RunningCard.svelte";
   import SettingsDialog from "$lib/components/SettingsDialog.svelte";
@@ -68,6 +70,10 @@
   let simulations = $state.raw<Simulation[]>([]);
   let error = $state<string | null>(null);
   let query = $state("");
+  let searchInput = $state<HTMLInputElement | null>(null);
+  let searchFocused = $state(false);
+  /** Row picked with the arrow keys, among `shownApps`. */
+  let highlighted = $state(0);
   let now = $state(Date.now());
   let starting = $state<AppSummary | null>(null);
   let editingTimer = $state<Simulation | null>(null);
@@ -107,6 +113,53 @@
       appsById
     )
   );
+
+  /** The rows listed under the search box, in order. */
+  const shownApps = $derived(query.trim() ? results : [...favoriteApps, ...recentApps]);
+  const dialogOpen = $derived(
+    starting !== null || editingTimer !== null || settingsOpen || updateOpen
+  );
+
+  function isTyping(target: EventTarget | null): boolean {
+    return (
+      target instanceof HTMLElement &&
+      (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+    );
+  }
+
+  function onWindowKeydown(event: KeyboardEvent) {
+    if (dialogOpen || event.defaultPrevented) return;
+    const shortcut = windowShortcut(event, isTyping(event.target));
+    if (shortcut === null) return;
+    event.preventDefault();
+    if (shortcut === "focus-search") {
+      searchInput?.focus();
+      searchInput?.select();
+    } else {
+      settingsOpen = true;
+    }
+  }
+
+  function onSearchKeydown(event: KeyboardEvent) {
+    const shortcut = searchShortcut(event);
+    if (shortcut === null || event.isComposing) return;
+    if (shortcut === "next" || shortcut === "previous") {
+      event.preventDefault();
+      highlighted = moveHighlight(highlighted, shortcut === "next" ? 1 : -1, shownApps.length);
+    } else if (shortcut === "start") {
+      const app = shownApps[Math.min(highlighted, shownApps.length - 1)];
+      if (app && !runningIds.has(app.id)) {
+        event.preventDefault();
+        starting = app;
+      }
+    } else if (query) {
+      event.preventDefault();
+      query = "";
+      highlighted = 0;
+    } else {
+      searchInput?.blur();
+    }
+  }
 
   function message(err: unknown): string {
     return typeof err === "string" ? err : err instanceof Error ? err.message : String(err);
@@ -249,9 +302,12 @@
   });
 </script>
 
+<svelte:window onkeydown={onWindowKeydown} />
+
 {#snippet row(app: AppSummary)}
   <AppRow
     {app}
+    highlighted={searchFocused && shownApps[highlighted]?.id === app.id}
     running={runningIds.has(app.id)}
     queued={queuedIds.has(app.id)}
     favorite={library.isFavorite(app.id)}
@@ -330,13 +386,24 @@
       <InputGroup.Root>
         <InputGroup.Input
           placeholder="Search games"
+          bind:ref={searchInput}
           bind:value={query}
           disabled={loading}
           aria-label="Search games"
+          aria-keyshortcuts="Control+F /"
+          oninput={() => (highlighted = 0)}
+          onkeydown={onSearchKeydown}
+          onfocus={() => (searchFocused = true)}
+          onblur={() => (searchFocused = false)}
         />
         <InputGroup.Addon>
           <SearchIcon />
         </InputGroup.Addon>
+        {#if !searchFocused}
+          <InputGroup.Addon align="inline-end">
+            <Kbd>/</Kbd>
+          </InputGroup.Addon>
+        {/if}
       </InputGroup.Root>
 
       <ScrollArea class="min-h-0 flex-1">

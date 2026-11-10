@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The **Queue** tab shows how many games are left and when the queue should be done, or how long it takes before it is started. With **Vary times** on, it is an estimate.
+- Keyboard shortcuts: Ctrl+F or / focuses the search, the arrow keys pick a game in the list, Enter opens its start dialog, Esc clears the search, and Ctrl+, opens the settings.
 - **Start a favorite** in the tray menu starts one of your first 10 favorites with the duration and executable you last used for it, without opening the window. A game that is already running is greyed out.
 
 ### Changed
