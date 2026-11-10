@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-10
+
 ### Added
 
 - The **Queue** tab shows how many games are left and when the queue should be done, or how long it takes before it is started. With **Vary times** on, it is an estimate.
@@ -98,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stand-in processes are stopped when Orbsmith exits, exit on their own if it crashes, and leftovers are cleaned up at startup.
 - Windows installers (`setup.exe` and MSI). The `setup.exe` uninstaller can delete the app data.
 
-[Unreleased]: https://github.com/alexwauquier/orbsmith/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/alexwauquier/orbsmith/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/alexwauquier/orbsmith/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/alexwauquier/orbsmith/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/alexwauquier/orbsmith/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/alexwauquier/orbsmith/compare/v0.3.0...v0.4.0
