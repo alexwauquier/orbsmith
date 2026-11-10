@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-10
+
 ### Added
 
 - In-app updates. Orbsmith checks GitHub for a new version at startup, shows what's new, and installs it when you choose to. Updates are signed, and a download whose signature does not match is refused. The check can be turned off in the settings, which also have a **Check now** button.
@@ -82,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stand-in processes are stopped when Orbsmith exits, exit on their own if it crashes, and leftovers are cleaned up at startup.
 - Windows installers (`setup.exe` and MSI). The `setup.exe` uninstaller can delete the app data.
 
-[Unreleased]: https://github.com/alexwauquier/orbsmith/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/alexwauquier/orbsmith/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/alexwauquier/orbsmith/compare/v0.5.0...v1.0.0
 [0.5.0]: https://github.com/alexwauquier/orbsmith/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/alexwauquier/orbsmith/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/alexwauquier/orbsmith/compare/v0.2.0...v0.3.0
