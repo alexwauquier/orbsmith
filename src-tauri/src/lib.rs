@@ -12,6 +12,7 @@ use std::time::{Duration, SystemTime};
 use orbsmith_core::{Layout, Os, Queue, Settings, cleanup};
 use tauri::utils::config::{AppDirectoriesOverride, AppDirectoryOverrides};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
+use tauri_plugin_log::{Target, TargetKind};
 
 use crate::state::AppState;
 
@@ -50,6 +51,12 @@ pub fn run() -> tauri::Result<()> {
                 tauri_plugin_log::Builder::default()
                     .level(log::LevelFilter::Info)
                     .max_file_size(LOG_FILE_MAX_BYTES)
+                    // The default file is named after productName, "Orbsmith".
+                    .clear_targets()
+                    .target(Target::new(TargetKind::Stdout))
+                    .target(Target::new(TargetKind::LogDir {
+                        file_name: Some("orbsmith".into()),
+                    }))
                     .build(),
             )?;
 
