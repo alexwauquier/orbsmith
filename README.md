@@ -53,13 +53,15 @@ The Releases page also lists the SHA-256 checksum of each file.
 
 1. Search for a game by name. Star the ones you use often: favorites and recently started games show up before you search. **Clear** empties the recent games.
 2. Click **Start**, enter how long the game should run (for example, a quest duration), then **Start now**: the game stops automatically once that time has elapsed. Untick **Stop automatically** to keep it running until you stop it. If a game lists several executables and isn't detected, pick another one in **Executable**. Orbsmith remembers the duration and executable you last used for each game.
-3. The **Running** panel lists the active games with their remaining time. You can change the timer or stop a game at any time.
+3. The **Running** panel lists the active games with their remaining time. You can change the timer or stop a game at any time. If the computer sleeps, the time asleep is added back to the timers, since the games did not run meanwhile.
+
+Keyboard shortcuts: <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> focuses the search. In the search box, <kbd>↑</kbd> and <kbd>↓</kbd> pick a game, <kbd>Enter</kbd> opens its start dialog and <kbd>Esc</kbd> clears the search. <kbd>Ctrl</kbd>+<kbd>,</kbd> opens the settings.
 
 ![The start dialog](docs/screenshots/start-dialog.png)
 
 ### Queue
 
-To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. Reorder it with the arrows, or empty it with the bin button. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps its remaining time: **Resume** restarts it for just that long, then carries on with the queue. **Stop all** in the tray menu pauses the queue the same way. Stopping a queued game from the **Running** tab skips to the next one. The queue is saved: after closing Orbsmith, it comes back paused, ready to resume.
+To run several games in a row, choose **Add to queue** instead of **Start now**: the game joins the **Queue** tab with its duration. Reorder it with the arrows, or empty it with the bin button. **Start queue** runs them one after another, each for its duration, and works through the list on its own, even when the window is hidden in the tray. **Pause** stops the current game and keeps its remaining time: **Resume** restarts it for just that long, then carries on with the queue. **Stop all** in the tray menu pauses the queue the same way. Stopping a queued game from the **Running** tab skips to the next one. The queue is saved: after closing Orbsmith, it comes back paused, ready to resume. Above the list, the **Queue** tab shows how many games are left and when the queue should be done, or how long it takes before you start it.
 
 ![The queue, running its first game](docs/screenshots/queue.png)
 
@@ -69,7 +71,7 @@ Two more settings make the queue's timing less regular. **Wait between games** p
 
 Simulated games run in the background: they don't appear in the taskbar. A notification tells you when one stops on its own.
 
-Closing the window while games are running keeps Orbsmith in the system tray, so they keep running. Click the tray icon to reopen it; its menu also stops every game or quits. With nothing running, closing the window quits Orbsmith. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
+Closing the window while games are running keeps Orbsmith in the system tray, so they keep running. Click the tray icon to reopen it. Its menu also starts one of your first 10 favorites with the duration and executable you last used for it (**Start a favorite**), stops every game, or quits. With nothing running, closing the window quits Orbsmith. If Orbsmith crashes, its stand-in processes exit on their own, and any leftover is cleaned up at the next start.
 
 The list of games is cached and downloaded again once it is a day old; the refresh button in the header updates it right away. Orbsmith only downloads that public list, the game icons and, to look for updates, the latest release from GitHub: no account, no login.
 
@@ -93,7 +95,7 @@ Versions before 1.0.0 have no updater: install the new version over the old one,
 
 ## Data and uninstalling
 
-Orbsmith keeps its data in `%APPDATA%\Orbsmith` on Windows and `~/.local/share/orbsmith` on Linux: the cached list of games, your settings, the queue, the stand-in executables, the log, and the WebView data, which includes your favorites, recent games and how you last started each one.
+Orbsmith keeps its data in `%APPDATA%\Orbsmith` on Windows and `~/.local/share/orbsmith` on Linux: the cached list of games, your settings, the queue, your favorites and recent games with how you last started each one (`library.json`), the stand-in executables, the log, and the WebView data.
 
 - The `setup.exe` uninstaller deletes that folder if you tick **Delete the application data**.
 - The MSI uninstaller leaves it in place, as Windows Installer does for user data. Delete the folder by hand to remove it.
